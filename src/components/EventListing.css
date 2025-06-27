@@ -1,0 +1,58 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap');
+
+
+.event-listing-container {
+    max-width: 100vw;
+    height: 80vh; /* or 100vh minus nav/header if needed */
+    margin: 0 auto;
+    display: flex;
+    flex-direction: column;
+}
+
+.event-table-container {
+    flex: 1;
+    overflow-y: auto;
+    background: rgba(255,255,255,0.95);
+    border-radius: 12px;
+    box-shadow: 0 4px 24px rgba(0,0,0,0.08);
+    /* Set a max-height if you want to control the scroll area */
+}
+
+.event-table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+    min-width: 600px;
+    font-family: 'Inter', Arial, Helvetica, sans-serif;
+
+}
+
+.event-table th, .event-table td {
+    padding: 14px 18px;
+    border-bottom: 1px solid #e0e0e0;
+    text-align: left;
+}
+
+.event-table th {
+    background: #f7f7fa;
+    color: #333;
+    font-weight: 600;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    position: sticky;
+    top: 0;
+    z-index: 2;
+}
+
+.event-table tr:last-child td {
+    border-bottom: none;
+}
+
+.event-table tr:hover {
+    background: #f0f8ff;
+    transition: background 0.2s;
+}
+
+.action-col {
+    text-align: center;
+}
