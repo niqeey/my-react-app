@@ -102,6 +102,11 @@ const handleDelete = (eventId) => {
         });
     };
 
+    // New: handle row click
+    const handleRowClick = (eventId) => {
+        navigate(`/event/${eventId}`);
+    };
+
     if (loading) return <div>Loading events...</div>;
     if (error) return <div>Error: {error}</div>;
 
@@ -116,12 +121,20 @@ const handleDelete = (eventId) => {
                             <th>Date</th>
                             <th>Location</th>
                             <th>Country</th>
-                            <th className="action-col"style={{ display: 'flex', gap: '8px', justifyContent: 'center' }}>Action</th>
+                            <th className="action-col" style={{ display: 'flex', gap: '8px', justifyContent: 'center' }}>Action</th>
                         </tr>
                     </thead>
                     <tbody>
                         {Array.isArray(events) && events.map(event => (
-                            <tr key={event.id}>
+                            <tr
+                                key={event.id}
+                                style={{ cursor: 'pointer' }}
+                                onClick={e => {
+                                    // Prevent row click if clicking a button
+                                    if (e.target.tagName === 'BUTTON') return;
+                                    handleRowClick(event.id);
+                                }}
+                            >
                                 <td>{event.name}</td>
                                 <td>{formatDate(event.eventDt)}</td>
                                 <td>{event.location}</td>
@@ -139,6 +152,19 @@ const handleDelete = (eventId) => {
                                         onClick={() => navigate(`/racesetup/${event.id}`)}
                                     >
                                         Race Setup
+                                    </button>
+                                    <button
+                                        style={{
+                                            background: '#007bff',
+                                            color: '#fff',
+                                            border: 'none',
+                                            borderRadius: '4px',
+                                            padding: '6px 12px',
+                                            cursor: 'pointer'
+                                        }}
+                                        onClick={() => navigate(`/topevent/${event.id}/B`)}
+                                    >
+                                        Top Event Page
                                     </button>
                                     <button
                                         style={{

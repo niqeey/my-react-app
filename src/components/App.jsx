@@ -10,6 +10,8 @@ import FullResultingPage from './FullResultingPage';
 import StatisticPage from './StatisticPage';
 import { OrgProvider } from './OrgContext';
 import EventListing from './EventListing';
+import EventPage from './EventPage'; // adjust path if needed
+import TopEventPage from './TopEventPage'; // <-- Add this import
 
 
 const greyOutStyle = {
@@ -99,19 +101,25 @@ const NavBar = () => {
 };
 
 const Footer = () => (
-    <footer style={{
-        width: '100%',
-        textAlign: 'center',
-        padding: '16px 0',
-        background: 'rgba(255, 255, 255, 0.01)',
-        color: '#555',
-        position: 'fixed',
-        left: 0,
-        bottom: 0,
-        zIndex: 999
-    }}>
-        © {new Date().getFullYear()} My Pace Tracker. All rights reserved.
-    </footer>
+    
+            <footer
+                style={{
+                    width: '100%',
+                    height: 60,
+                    background: 'rgba(240,246,255,0.8)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontSize: 14,
+                    color: '#888',
+                    position: 'fixed',
+                    left: 0,
+                    bottom: 0,
+                    zIndex: 10
+                }}
+            >
+                © 2025 MyPaceTracker. All rights reserved.
+            </footer>
 );
 
 const App = () => {
@@ -123,8 +131,12 @@ const App = () => {
                     <Routes>
                         <Route path="/" element={<Home />} />
                         <Route path="/login" element={<Login />} />
+                        <Route path="/dashboard" element={<Dashboard />} />
                         <Route path="/eventlisting" element={<EventListing />} />
                         <Route path="/race/setup/:eventId" element={<RaceSetup />} />
+                        <Route path="/event/:eventId" element={<EventPage />} />
+                        <Route path="/topevent/:eventId/:category" element={<TopEventPage />} /> {/* <-- Add this line */}
+                        <Route path="/statistic/:eventId" element={<StatisticPage />} /> {/* <-- Add this line */}
                     </Routes>
                 </div>
                 <Footer />
