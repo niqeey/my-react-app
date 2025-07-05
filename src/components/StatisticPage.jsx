@@ -71,7 +71,7 @@ const StatisticPage = () => {
                 {/* Back Button */}
                 <div style={{ width: '100%', marginBottom: 16, display: 'flex', justifyContent: 'flex-start' }}>
                     <button
-                        onClick={() => navigate(`/event/${eventId}`)}
+                        onClick={() => navigate(-1)}
                         style={{
                             background: 'none',
                             color: '#007bff',
@@ -85,7 +85,7 @@ const StatisticPage = () => {
                         }}
                     >
                         <span style={{ fontSize: 20, marginRight: 6 }}>&larr;</span>
-                        Back to event
+                        Back
                     </button>
                 </div>
                 <h1 style={{

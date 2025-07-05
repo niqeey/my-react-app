@@ -133,7 +133,7 @@ const App = () => {
                         <Route path="/login" element={<Login />} />
                         <Route path="/dashboard" element={<Dashboard />} />
                         <Route path="/eventlisting" element={<EventListing />} />
-                        <Route path="/race/setup/:eventId" element={<RaceSetup />} />
+                        <Route path="/racesetup/:eventId" element={<RaceSetup />} />
                         <Route path="/event/:eventId" element={<EventPage />} />
                         <Route path="/topevent/:eventId/:category" element={<TopEventPage />} /> {/* <-- Add this line */}
                         <Route path="/statistic/:eventId" element={<StatisticPage />} /> {/* <-- Add this line */}
