@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useOrg } from './OrgContext';
 import { useNavigate } from 'react-router-dom';
+import apiBase from '../apiBase';
 
 const loginStyle = {
     background: 'rgba(187, 186, 192, 0.39)',
@@ -30,6 +31,7 @@ const buttonStyle = {
     cursor: 'pointer'
 };
 
+
 const Login = () => {
     const [username, setUsername] = useState('');
     const [password, setPassword] = useState('');
@@ -43,7 +45,7 @@ const Login = () => {
         e.preventDefault();
         setMessage('');
         try {
-            const res = await fetch('/auth/login', {
+            const res = await fetch(`${apiBase}/auth/login`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ username, password })

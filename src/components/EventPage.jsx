@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom'; // <-- add useNavigate
 import { authFetch } from '../utils/authFetch';
+import apiBase from '../apiBase';
 
 const EventPage = () => {
     const { eventId } = useParams();
@@ -16,7 +17,7 @@ const EventPage = () => {
 
     // Load categories
     useEffect(() => {
-        authFetch('/race/categories', {
+        authFetch(`${apiBase}/race/categories`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ eventId })
@@ -47,7 +48,7 @@ const EventPage = () => {
         if (!selectedCat) return;
         setCatDetailLoading(true);
         setCatDetail(null);
-        fetch('/report/event/category', {
+        fetch(`${apiBase}/report/event/category`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -215,7 +216,7 @@ const EventPage = () => {
                             onClick={async () => {
                                 if (!selectedCat) return;
                                 const orgId = sessionStorage.getItem('orgId');
-                                const res = await fetch('/report/event/category/xlsx', {
+                                const res = await fetch(`${apiBase}/report/event/category/xlsx`, {
                                     method: 'POST',
                                     headers: {
                                         'Content-Type': 'application/json',

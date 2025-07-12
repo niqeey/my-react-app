@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { authFetch } from '../utils/authFetch';
+import apiBase from '../apiBase';
 
 const cardStyle = {
     border: '1px solid #e0e0e0',
@@ -39,7 +40,7 @@ const RaceSetup = () => {
     const [editingCp, setEditingCp] = useState({}); // { [catId]: [cp1, cp2, ...] }
 
     useEffect(() => {
-        authFetch('/race/categories', {
+        authFetch(`${apiBase}/race/categories`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ eventId })
@@ -92,13 +93,13 @@ const RaceSetup = () => {
         const cpArr = editingCp[cat.catId] || [];
         const checkpointlist = cpArr.filter(Boolean).join(',');
         try {
-            await authFetch('/race/category/update-cplist', {
+            await authFetch(`${apiBase}/race/category/update-cplist`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ eventId, catId: cat.catId, checkpointlist })
             });
             // Refresh categories
-            const res = await authFetch('/race/categories', {
+            const res = await authFetch(`${apiBase}/race/categories`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ eventId })

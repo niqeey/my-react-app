@@ -1,5 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom'; // <-- import useNavigate
+import apiBase from '../apiBase';
+
 
 const columnDisplayNames = {
     cat: 'Cat',
@@ -28,7 +30,7 @@ const StatisticPage = () => {
         const storedName = sessionStorage.getItem('eventName');
         setEventName(storedName || 'Event');
 
-        fetch('/statistic/full', {
+        fetch(`${apiBase}/statistic/full`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ eventId })

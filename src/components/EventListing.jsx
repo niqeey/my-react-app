@@ -3,6 +3,7 @@ import { authFetch } from '../utils/authFetch';
 import { useOrg } from './OrgContext';
 import { useNavigate } from 'react-router-dom';
 import './EventListing.css';
+import apiBase from '../apiBase';
 
 const formatDate = (dateString) => {
     const date = new Date(dateString);
@@ -37,7 +38,7 @@ const EventListing = () => {
 
     const fetchEvents = () => {
         setLoading(true);
-        authFetch('/org/event/list', {
+        authFetch(`${apiBase}/org/event/list`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ orgId })
@@ -58,7 +59,7 @@ const EventListing = () => {
 
 const handleDelete = (eventId) => {
     if (window.confirm('Are you sure you want to delete this event?')) {
-        authFetch('/org/event/delete', {
+        authFetch(`${apiBase}/org/event/delete`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ eventId })
@@ -83,7 +84,7 @@ const handleDelete = (eventId) => {
 
     const handleCreate = (e) => {
         e.preventDefault();
-        authFetch('/org/event/create', {
+        authFetch(`${apiBase}/org/event/create`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(newEvent)
