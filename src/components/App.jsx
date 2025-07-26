@@ -12,7 +12,14 @@ import { OrgProvider } from './OrgContext';
 import EventListing from './EventListing';
 import EventPage from './EventPage'; // adjust path if needed
 import TopEventPage from './TopEventPage'; // <-- Add this import
-
+import Registered from './Registered';
+import Started from './Started';
+import DidNotStart from './DidNotStart';
+import Finished from './Finished';
+import DidNotFinish from './DidNotFinish';
+import FalseStart from './FalseStart';
+import NoStartButFinished from './NoStartButFinished';
+import Disqualified from './Disqualified';
 
 const greyOutStyle = {
     background: 'rgba(255, 255, 255, 0.23)',
@@ -138,6 +145,14 @@ const App = () => {
                         <Route path="/event/:eventId" element={<EventPage />} />
                         <Route path="/topevent/:eventId/:category" element={<TopEventPage />} /> {/* <-- Add this line */}
                         <Route path="/statistic/:eventId" element={<StatisticPage />} /> {/* <-- Add this line */}
+                        <Route path="/registered/:eventId" element={<Registered />} />
+                        <Route path="/started/:eventId" element={<Started />} />
+                        <Route path="/did-not-start/:eventId" element={<DidNotStart />} />
+                        <Route path="/finished/:eventId" element={<Finished />} />
+                        <Route path="/did-not-finish/:eventId" element={<DidNotFinish />} /> {/* Adjusted path */}
+                        <Route path="/false-start/:eventId" element={<FalseStart />} />
+                        <Route path="/no-start-but-finished/:eventId" element={<NoStartButFinished />} />
+                        <Route path="/disqualified/:eventId" element={<Disqualified />} />
                     </Routes>
                 </div>
                 <Footer />

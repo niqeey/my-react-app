@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { authFetch } from '../utils/authFetch';
 import apiBase from '../apiBase';
@@ -14,6 +14,22 @@ const TopEventPage = () => {
     const [selectedCat, setSelectedCat] = useState(null);
     const [catDetail, setCatDetail] = useState(null);
     const [catDetailLoading, setCatDetailLoading] = useState(false);
+
+    // Detect if the user is on mobile
+    const [isMobile, setIsMobile] = useState(window.innerWidth <= 600);
+
+    useEffect(() => {
+        const handleResize = () => setIsMobile(window.innerWidth <= 600);
+        window.addEventListener('resize', handleResize);
+        return () => window.removeEventListener('resize', handleResize);
+    }, []);
+
+    // Format time values by removing milliseconds
+    function formatTimeNoMs(val) {
+        if (typeof val !== 'string') return val;
+        // Remove .xxx if present (milliseconds)
+        return val.replace(/\.\d{1,3}$/, '');
+    }
 
     // Load categories
     useEffect(() => {
@@ -70,20 +86,7 @@ const TopEventPage = () => {
     if (loading) return <div>Loading categories...</div>;
     if (error) return <div>{error}</div>;
 
-    // Get dynamic columns based on cplist
-    let columns = [];
-    if (Array.isArray(catDetail) && catDetail.length > 0) {
-        columns = [
-            'rank1Cat', 'bib', 'name', 'officialTime', 'netTime', 'timeStart'
-        ];
-        const cplist = catDetail[0].cplist ? catDetail[0].cplist.split(',') : [];
-        cplist.forEach(cp => {
-            const key = cp.trim().replace('Time', 'time');
-            if (!columns.includes(key)) columns.push(key);
-        });
-        columns.push('timeFinish');
-    }
-
+    // Column display name mapping
     const columnDisplayNames = {
         rank1Cat: 'Rank',
         bib: 'Bib',
@@ -92,17 +95,31 @@ const TopEventPage = () => {
         timeFinish: 'TimeFinish',
         officialTime: 'OfficialTime',
         netTime: 'NetTime',
-        timeCP1: 'TimeCP1',
-        timeCP2: 'TimeCP2',
-        timeCP3: 'TimeCP3',
-        timeCP4: 'TimeCP4',
-        timeCP5: 'TimeCP5',
-        timeCP6: 'TimeCP6',
-        timeCP7: 'TimeCP7',
-        timeCP8: 'TimeCP8',
-        timeCP9: 'TimeCP9',
-        timeCP10: 'TimeCP10',
     };
+
+    // Get dynamic columns based on cplist
+    let columns = [];
+    if (Array.isArray(catDetail) && catDetail.length > 0) {
+        // Always show these columns first
+        columns = [
+            'rank1Cat', 'bib', 'name', 'officialTime', 'netTime', 'timeStart'
+        ];
+
+        // Parse cplist for CP columns
+        const cplist = catDetail[0].cplist
+            ? catDetail[0].cplist.split(',').map(cp => cp.trim().replace('Time', 'time')) // Convert "TimeCP1" to "timeCP1"
+            : [];
+
+        // Dynamically rename timeCP columns
+        const availableTimeCPs = cplist.filter(cp => /^timeCP\d+$/.test(cp)); // Ensure valid timeCP keys
+        availableTimeCPs.forEach((key, index) => {
+            columnDisplayNames[key] = `Split_${index + 1}`;
+            if (!columns.includes(key)) columns.push(key); // Add to columns if not already present
+        });
+
+        // Always show finish and official/net time
+        if (!columns.includes('timeFinish')) columns.push('timeFinish');
+    }
 
     return (
         <div
@@ -114,6 +131,7 @@ const TopEventPage = () => {
                 flexDirection: 'column',
                 alignItems: 'center',
                 justifyContent: 'flex-start',
+                padding: '0 2vw'
             }}
         >
             <div
@@ -122,7 +140,7 @@ const TopEventPage = () => {
                     width: '100%',
                     maxWidth: 1000,
                     margin: '0 auto',
-                    padding: 24,
+                    padding: '4vw 2vw 24px 2vw',
                     background: 'rgba(255,255,255,0.97)',
                     borderRadius: 12,
                     boxShadow: '0 4px 24px rgba(0,0,0,0.1)',
@@ -256,82 +274,102 @@ const TopEventPage = () => {
                     <div>Loading details...</div>
                 ) : catDetail && columns.length > 0 ? (
                     <div style={{ width: '100%' }}>
-                        <table
-                            style={{
-                                width: '100%',
-                                maxWidth: '100%',
-                                tableLayout: 'fixed',
-                                borderCollapse: 'collapse',
-                                marginTop: 0,
-                            }}
-                        >
-                            <thead>
-                                <tr>
-                                    {columns.map(key => {
-                                        let width;
-                                        if (key === 'rank1Cat') width = '8%';
-                                        else if (key === 'bib') width = '8%';
-                                        else if (key === 'name') width = '32%';
-                                        else width = `${(100 - 8 - 8 - 32) / (columns.length - 3)}%`;
-                                        return (
-                                            <th
-                                                key={key}
-                                                style={{
-                                                    textAlign: 'left',
-                                                    padding: '6px 4px',
-                                                    background: '#f0f6ff',
-                                                    whiteSpace: 'normal',
-                                                    fontSize: 13,
-                                                    wordBreak: 'break-word',
-                                                    overflow: 'hidden',
-                                                    textOverflow: 'ellipsis',
-                                                    width,
-                                                    minWidth: width,
-                                                    maxWidth: width,
-                                                }}
-                                            >
-                                                {columnDisplayNames[key] || key}
-                                            </th>
-                                        );
-                                    })}
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {catDetail.map((row, idx) => (
-                                    <tr
-                                        key={idx}
-                                        style={{
-                                            background: idx % 2 === 0 ? '#fff' : '#f7f7f7'
-                                        }}
-                                    >
-                                        {columns.map((key, i) => {
+                        <div style={{
+                            width: '100%',
+                            overflowX: 'auto', // enables horizontal scroll on mobile
+                        }}>
+                            <table
+                                style={{
+                                    width: '100%',
+                                    minWidth: 600, // Ensures table doesn't shrink too much
+                                    maxWidth: '100%',
+                                    tableLayout: 'fixed',
+                                    borderCollapse: 'collapse',
+                                    marginTop: 0,
+                                    fontSize: '1rem'
+                                }}
+                            >
+                                <thead>
+                                    <tr>
+                                        {columns.map((key, index) => {
                                             let width;
-                                            if (key === 'rank1Cat') width = '8%';
-                                            else if (key === 'bib') width = '8%';
-                                            else if (key === 'name') width = '32%';
-                                            else width = `${(100 - 8 - 8 - 32) / (columns.length - 3)}%`;
+                                            if (key === 'rank1Cat') width = '8%'; // First column
+                                            else if (key === 'bib') width = '8%'; // Second column
+                                            else if (key === 'name') width = '20%'; // Third column
+                                            else width = `${(100 - 8 - 8 - 20) / (columns.length - 3)}%`; // Remaining columns
+
                                             return (
-                                                <td
-                                                    key={i}
+                                                <th
+                                                    key={key}
                                                     style={{
+                                                        textAlign: 'left',
                                                         padding: '6px 4px',
-                                                        fontSize: 12,
+                                                        background: '#f0f6ff',
+                                                        fontSize: 13,
                                                         wordBreak: 'break-word',
                                                         overflow: 'hidden',
                                                         textOverflow: 'ellipsis',
+                                                        whiteSpace: key === 'name' ? 'normal' : 'nowrap', // Allow wrapping only for the third column
                                                         width,
                                                         minWidth: width,
                                                         maxWidth: width,
                                                     }}
                                                 >
-                                                    {row[key] !== undefined ? row[key] : ''}
-                                                </td>
+                                                    {columnDisplayNames[key] || key}
+                                                </th>
                                             );
                                         })}
                                     </tr>
-                                ))}
-                            </tbody>
-                        </table>
+                                </thead>
+                                <tbody>
+                                    {catDetail.map((row, idx) => (
+                                        <tr
+                                            key={idx}
+                                            style={{
+                                                background: idx % 2 === 0 ? '#fff' : '#f7f7f7'
+                                            }}
+                                        >
+                                            {columns.map((key, i) => {
+                                                let width;
+                                                if (key === 'rank1Cat') width = '8%'; // First column
+                                                else if (key === 'bib') width = '8%'; // Second column
+                                                else if (key === 'name') width = '20%'; // Third column
+                                                else width = `${(100 - 8 - 8 - 20) / (columns.length - 3)}%`; // Remaining columns
+
+                                                return (
+                                                    <td
+                                                        key={i}
+                                                        style={{
+                                                            padding: '6px 4px',
+                                                            fontSize: 12,
+                                                            wordBreak: 'break-word',
+                                                            overflow: 'hidden',
+                                                            textOverflow: 'ellipsis',
+                                                            whiteSpace: key === 'name' ? 'normal' : 'nowrap', // Allow wrapping only for the third column
+                                                            width,
+                                                            minWidth: width,
+                                                            maxWidth: width,
+                                                        }}
+                                                    >
+                                                        {row[key] !== undefined
+                                                            ? (isMobile && (
+                                                                key === 'officialTime' ||
+                                                                key === 'netTime' ||
+                                                                key === 'timeStart' ||
+                                                                key === 'timeFinish' ||
+                                                                /^timeCP\d+$/.test(key)
+                                                            )
+                                                                ? formatTimeNoMs(row[key]) // Format time for mobile view
+                                                                : row[key])
+                                                            : ''}
+                                                    </td>
+                                                );
+                                            })}
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
                     </div>
                 ) : (
                     <div style={{ color: '#888', textAlign: 'center' }}>Select a category to view details.</div>

@@ -88,3 +88,13 @@ nav a:hover {
 .main-content {
     margin-top: 64px; /* Adjust based on nav height */
 }
+
+@media (max-width: 480px) {
+  h1, h2 {
+    font-size: 1.2rem !important;
+  }
+  .login-popup {
+    min-width: 90vw !important;
+    padding: 16px !important;
+  }
+}

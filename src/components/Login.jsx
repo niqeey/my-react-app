@@ -5,20 +5,22 @@ import apiBase from '../apiBase';
 
 const loginStyle = {
     background: 'rgba(187, 186, 192, 0.39)',
-    padding: '40px',
+    padding: '32px 16px',
     borderRadius: '15px',
     boxShadow: '0 4px 24px rgba(0,0,0,0.2)',
     maxWidth: '350px',
-    margin: '60px auto'
+    width: '95vw',
+    margin: '40px auto'
 };
 
 const inputStyle = {
     width: '100%',
-    padding: '10px',
+    padding: '12px',
     margin: '10px 0',
     borderRadius: '5px',
     border: '1px solid #ccc',
-    boxSizing: 'border-box'
+    boxSizing: 'border-box',
+    fontSize: '1rem'
 };
 
 const buttonStyle = {
