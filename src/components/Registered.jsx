@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import PageWrapper from './PageWrapper';
 import { useNavigate, useParams } from 'react-router-dom'; // Import useParams
 import apiBase from '../apiBase'; // Import apiBase
+import { authFetch } from '../utils/authFetch';
 
 const Registered = () => {
     const { eventId } = useParams(); // Get eventId from the URL
@@ -13,12 +14,15 @@ const Registered = () => {
     useEffect(() => {
         const fetchRegisteredParticipants = async () => {
             try {
-                const response = await fetch(`${apiBase}/statistic/registration`, {
+                console.log('Fetching registered participants for eventId:', eventId);
+                const response = await authFetch(`${apiBase}/statistic/registration`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ eventId }) // Use eventId from the URL
                 });
                 const result = await response.json();
+                console.log('Registered participants response:', result);
+                console.log('Is array?', Array.isArray(result), 'Length:', result?.length);
                 setData(result);
             } catch (error) {
                 console.error('Error fetching registered participants:', error);
@@ -83,20 +87,20 @@ const Registered = () => {
                         marginTop: '20px'
                     }}>
                         <thead>
-                            <tr>
-                                <th style={{ border: '1px solid #ccc', padding: '8px' }}>Item</th>
-                                <th style={{ border: '1px solid #ccc', padding: '8px' }}>Category</th>
-                                <th style={{ border: '1px solid #ccc', padding: '8px' }}>Bib</th>
-                                <th style={{ border: '1px solid #ccc', padding: '8px' }}>Name</th>
+                            <tr style={{ background: '#f5f5f5' }}>
+                                <th style={{ border: '1px solid #ddd', padding: '12px 8px', textAlign: 'left', fontWeight: 600 }}>Item</th>
+                                <th style={{ border: '1px solid #ddd', padding: '12px 8px', textAlign: 'left', fontWeight: 600 }}>Category</th>
+                                <th style={{ border: '1px solid #ddd', padding: '12px 8px', textAlign: 'left', fontWeight: 600 }}>Bib</th>
+                                <th style={{ border: '1px solid #ddd', padding: '12px 8px', textAlign: 'left', fontWeight: 600 }}>Name</th>
                             </tr>
                         </thead>
                         <tbody>
-                            {data.map((participant, index) => (
-                                <tr key={index}>
-                                    <td style={{ border: '1px solid #ccc', padding: '8px' }}>{participant.item}</td>
-                                    <td style={{ border: '1px solid #ccc', padding: '8px' }}>{participant.category}</td>
-                                    <td style={{ border: '1px solid #ccc', padding: '8px' }}>{participant.bib}</td>
-                                    <td style={{ border: '1px solid #ccc', padding: '8px' }}>{participant.name}</td>
+                            {(Array.isArray(data) ? data : []).map((participant, index) => (
+                                <tr key={index} style={{ background: index % 2 === 0 ? '#fff' : '#fafafa' }}>
+                                    <td style={{ border: '1px solid #ddd', padding: '10px 8px' }}>{participant.item}</td>
+                                    <td style={{ border: '1px solid #ddd', padding: '10px 8px' }}>{participant.category}</td>
+                                    <td style={{ border: '1px solid #ddd', padding: '10px 8px' }}>{participant.bib}</td>
+                                    <td style={{ border: '1px solid #ddd', padding: '10px 8px' }}>{participant.name}</td>
                                 </tr>
                             ))}
                         </tbody>

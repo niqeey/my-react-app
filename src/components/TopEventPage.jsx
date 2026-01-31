@@ -227,7 +227,7 @@ const TopEventPage = () => {
                             onClick={async () => {
                                 if (!selectedCat) return;
                                 const orgId = sessionStorage.getItem('orgId');
-                                const res = await fetch(`${apiBase}/report/event/category/top/xlsx`, {
+                                const res = await authFetch(`${apiBase}/report/event/category/top/xlsx`, {
                                     method: 'POST',
                                     headers: {
                                         'Content-Type': 'application/json',

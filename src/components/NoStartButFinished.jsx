@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom'; // Import useParams
+import { authFetch } from '../utils/authFetch';
 import apiBase from '../apiBase'; // Adjust the path based on your project structure
 
 const NoStartButFinished = () => {
@@ -12,12 +13,15 @@ const NoStartButFinished = () => {
     useEffect(() => {
         const fetchNoStartButFinishedParticipants = async () => {
             try {
-                const response = await fetch(`${apiBase}/statistic/nsbf`, {
+                console.log('Fetching NSBF participants for eventId:', eventId);
+                const response = await authFetch(`${apiBase}/statistic/nsbf`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ eventId }) // Use eventId from the URL
                 });
                 const result = await response.json();
+                console.log('NSBF response:', result);
+                console.log('Is array?', Array.isArray(result), 'Length:', result?.length);
                 setData(result);
             } catch (error) {
                 console.error('Error fetching No Start But Finished participants:', error);
@@ -81,26 +85,26 @@ const NoStartButFinished = () => {
                     marginTop: '20px'
                 }}>
                     <thead>
-                        <tr>
-                            <th style={{ border: '1px solid #ccc', padding: '8px' }}>Item</th>
-                            <th style={{ border: '1px solid #ccc', padding: '8px' }}>Category</th>
-                            <th style={{ border: '1px solid #ccc', padding: '8px' }}>Bib</th>
-                            <th style={{ border: '1px solid #ccc', padding: '8px' }}>Name</th>
-                            <th style={{ border: '1px solid #ccc', padding: '8px' }}>Time Start</th>
-                            <th style={{ border: '1px solid #ccc', padding: '8px' }}>Time Gun</th>
-                            <th style={{ border: '1px solid #ccc', padding: '8px' }}>Time Finish</th>
+                        <tr style={{ background: '#f5f5f5' }}>
+                            <th style={{ border: '1px solid #ddd', padding: '12px 8px', textAlign: 'left', fontWeight: 600 }}>Item</th>
+                            <th style={{ border: '1px solid #ddd', padding: '12px 8px', textAlign: 'left', fontWeight: 600 }}>Category</th>
+                            <th style={{ border: '1px solid #ddd', padding: '12px 8px', textAlign: 'left', fontWeight: 600 }}>Bib</th>
+                            <th style={{ border: '1px solid #ddd', padding: '12px 8px', textAlign: 'left', fontWeight: 600 }}>Name</th>
+                            <th style={{ border: '1px solid #ddd', padding: '12px 8px', textAlign: 'left', fontWeight: 600 }}>Time Start</th>
+                            <th style={{ border: '1px solid #ddd', padding: '12px 8px', textAlign: 'left', fontWeight: 600 }}>Time Gun</th>
+                            <th style={{ border: '1px solid #ddd', padding: '12px 8px', textAlign: 'left', fontWeight: 600 }}>Time Finish</th>
                         </tr>
                     </thead>
                     <tbody>
-                        {data.map((participant, index) => (
-                            <tr key={index}>
-                                <td style={{ border: '1px solid #ccc', padding: '8px' }}>{participant.item}</td>
-                                <td style={{ border: '1px solid #ccc', padding: '8px' }}>{participant.category}</td>
-                                <td style={{ border: '1px solid #ccc', padding: '8px' }}>{participant.bib}</td>
-                                <td style={{ border: '1px solid #ccc', padding: '8px' }}>{participant.name}</td>
-                                <td style={{ border: '1px solid #ccc', padding: '8px' }}>{participant.timeStart || 'N/A'}</td>
-                                <td style={{ border: '1px solid #ccc', padding: '8px' }}>{participant.timeGun || 'N/A'}</td>
-                                <td style={{ border: '1px solid #ccc', padding: '8px' }}>{participant.timeFinish || 'N/A'}</td>
+                        {(Array.isArray(data) ? data : []).map((participant, index) => (
+                            <tr key={index} style={{ background: index % 2 === 0 ? '#fff' : '#fafafa' }}>
+                                <td style={{ border: '1px solid #ddd', padding: '10px 8px' }}>{participant.item}</td>
+                                <td style={{ border: '1px solid #ddd', padding: '10px 8px' }}>{participant.category}</td>
+                                <td style={{ border: '1px solid #ddd', padding: '10px 8px' }}>{participant.bib}</td>
+                                <td style={{ border: '1px solid #ddd', padding: '10px 8px' }}>{participant.name}</td>
+                                <td style={{ border: '1px solid #ddd', padding: '10px 8px' }}>{participant.timeStart || 'N/A'}</td>
+                                <td style={{ border: '1px solid #ddd', padding: '10px 8px' }}>{participant.timeGun || 'N/A'}</td>
+                                <td style={{ border: '1px solid #ddd', padding: '10px 8px' }}>{participant.timeFinish || 'N/A'}</td>
                             </tr>
                         ))}
                     </tbody>

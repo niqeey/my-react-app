@@ -19,6 +19,9 @@ const EventPage = () => {
     const [loadingDetails, setLoadingDetails] = useState(false);
     const [bibInput, setBibInput] = useState(''); // <-- Added bibInput state
     const [isModalVisible, setIsModalVisible] = useState(false);
+    const [isEditing, setIsEditing] = useState(false);
+    const [editedDetails, setEditedDetails] = useState(null);
+    const [saving, setSaving] = useState(false);
     
     // Load categories
     useEffect(() => {
@@ -53,7 +56,7 @@ const EventPage = () => {
         if (!selectedCat) return;
         setCatDetailLoading(true);
         setCatDetail(null);
-        fetch(`${apiBase}/report/event/category`, {
+        authFetch(`${apiBase}/report/event/category`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -86,7 +89,7 @@ const EventPage = () => {
 
         setLoadingDetails(true);
         try {
-            const response = await fetch(`${apiBase}/participant/details`, {
+            const response = await authFetch(`${apiBase}/participant/details`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -101,12 +104,74 @@ const EventPage = () => {
             // console.log('CP List:', cplist);
 
             setParticipantDetails(result);
+            setEditedDetails(result); // Initialize edited details
+            setIsEditing(false); // Start in view mode
             setIsModalVisible(true); // Show the modal
         } catch (error) {
             console.error('Error fetching participant details:', error);
         } finally {
             setLoadingDetails(false);
         }
+    };
+
+    const handleSaveDetails = async () => {
+        setSaving(true);
+        try {
+            const response = await authFetch(`${apiBase}/participant/update`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    eventId: eventId,
+                    bib: editedDetails.bib,
+                    name: editedDetails.name,
+                    category: editedDetails.category,
+                    gender: editedDetails.gender,
+                    remark: editedDetails.remark,
+                    fs: editedDetails.fs,
+                    dns: editedDetails.dns,
+                    dnf: editedDetails.dnf,
+                    nsbf: editedDetails.nsbf,
+                    nr: editedDetails.nr,
+                    dq: editedDetails.dq,
+                    timeGun: editedDetails.timeGun,
+                    timeStart: editedDetails.timeStart,
+                    timeFinish: editedDetails.timeFinish,
+                    timeCP1: editedDetails.timeCP1,
+                    timeCP2: editedDetails.timeCP2,
+                    timeCP3: editedDetails.timeCP3,
+                    timeCP4: editedDetails.timeCP4,
+                    timeCP5: editedDetails.timeCP5,
+                    timeCP6: editedDetails.timeCP6,
+                    timeCP7: editedDetails.timeCP7,
+                    timeCP8: editedDetails.timeCP8
+                })
+            });
+            
+            if (response.ok) {
+                setParticipantDetails(editedDetails);
+                setIsEditing(false);
+                alert('Participant details updated successfully!');
+            } else {
+                alert('Failed to update participant details.');
+            }
+        } catch (error) {
+            console.error('Error updating participant details:', error);
+            alert('An error occurred while updating details.');
+        } finally {
+            setSaving(false);
+        }
+    };
+
+    const handleCancelEdit = () => {
+        setEditedDetails(participantDetails);
+        setIsEditing(false);
+    };
+
+    const handleFieldChange = (field, value) => {
+        setEditedDetails(prev => ({
+            ...prev,
+            [field]: value
+        }));
     };
 
     if (loading) return <div>Loading categories...</div>;
@@ -314,7 +379,7 @@ if (Array.isArray(catDetail) && catDetail.length > 0) {
                             onClick={async () => {
                                 if (!selectedCat) return;
                                 const orgId = sessionStorage.getItem('orgId');
-                                const res = await fetch(`${apiBase}/report/event/category/xlsx`, {
+                                const res = await authFetch(`${apiBase}/report/event/category/xlsx`, {
                                     method: 'POST',
                                     headers: {
                                         'Content-Type': 'application/json',
@@ -506,7 +571,10 @@ if (Array.isArray(catDetail) && catDetail.length > 0) {
             position: 'relative'
         }}>
             <button
-                onClick={() => setIsModalVisible(false)}
+                onClick={() => {
+                    setIsModalVisible(false);
+                    setIsEditing(false);
+                }}
                 style={{
                     position: 'absolute',
                     top: 16,
@@ -524,59 +592,391 @@ if (Array.isArray(catDetail) && catDetail.length > 0) {
                 <p>Loading participant details...</p>
             ) : participantDetails ? (
                 <div style={{
-                    gap: '16px', // Add spacing between the two divs
-                    marginTop: '16px', // Add some margin above the container
-                    justifyContent: 'space-between', // Space out the divs
-                    alignItems: 'center', // Align items at the top
+                    gap: '16px',
+                    marginTop: '16px',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
                     align: 'center'
                 }}>
-                        <h3>{participantDetails.bib} : {participantDetails.name}</h3>
-                        <p><strong>Category:</strong> {participantDetails.category}</p>
+                        <h3>
+                            {isEditing ? (
+                                <>
+                                    <input
+                                        type="text"
+                                        value={editedDetails.bib}
+                                        onChange={(e) => handleFieldChange('bib', e.target.value)}
+                                        style={{ width: '80px', marginRight: '8px', padding: '4px' }}
+                                    />
+                                    :
+                                    <input
+                                        type="text"
+                                        value={editedDetails.name}
+                                        onChange={(e) => handleFieldChange('name', e.target.value)}
+                                        style={{ width: '300px', marginLeft: '8px', padding: '4px' }}
+                                    />
+                                </>
+                            ) : (
+                                `${participantDetails.bib} : ${participantDetails.name}`
+                            )}
+                        </h3>
+                        <p>
+                            <strong>Category:</strong>{' '}
+                            {isEditing ? (
+                                <input
+                                    type="text"
+                                    value={editedDetails.category}
+                                    onChange={(e) => handleFieldChange('category', e.target.value)}
+                                    style={{ width: '100px', padding: '4px' }}
+                                />
+                            ) : (
+                                participantDetails.category
+                            )}
+                        </p>
                 <div style={{
-                    display: 'flex', // Use flexbox to align items side by side
-                    gap: '16px', // Add spacing between the two divs
-                    marginTop: '16px', // Add some margin above the container
-                    justifyContent: 'space-between', // Space out the divs
-                    alignItems: 'flex-start' // Align items at the top
+                    display: 'flex',
+                    gap: '16px',
+                    marginTop: '16px',
+                    justifyContent: 'space-between',
+                    alignItems: 'flex-start'
                 }}>
                     <div style={{
-                        flex: 1, // Allow this div to take up equal space
+                        flex: 1,
                         padding: '16px',
                         background: 'rgba(255, 255, 255, 0.9)',
                         borderRadius: '8px',
                         boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1)'
                     }}>
-                        <p><strong>Gender:</strong> {participantDetails.gender}</p>
-<p><strong>Category Rank:</strong> {participantDetails.rank1Cat}</p>
-<p><strong>Gender Rank:</strong> {participantDetails.rank1Mix}</p>
-<p><strong>Overall Rank:</strong> {participantDetails.rank1Tot}</p>
-<p><strong>False Start:</strong> <span style={{ color: participantDetails.fs ? 'red' : 'inherit' }}>{participantDetails.fs ? 'True' : 'False'}</span></p>
-<p><strong>Did Not Start:</strong> <span style={{ color: participantDetails.dns ? 'red' : 'inherit' }}>{participantDetails.dns ? 'True' : 'False'}</span></p>
-<p><strong>Did Not Finish:</strong> <span style={{ color: participantDetails.dnf ? 'red' : 'inherit' }}>{participantDetails.dnf ? 'True' : 'False'}</span></p>
-<p><strong>NSBF:</strong> <span style={{ color: participantDetails.nsbf ? 'red' : 'inherit' }}>{participantDetails.nsbf ? 'True' : 'False'}</span></p>
-<p><strong>No Result:</strong> <span style={{ color: participantDetails.nr ? 'red' : 'inherit' }}>{participantDetails.nr ? 'True' : 'False'}</span></p>
-<p><strong>Disqualified:</strong> <span style={{ color: participantDetails.dq ? 'red' : 'inherit' }}>{participantDetails.dq ? 'True' : 'False'}</span></p>
-<p><strong>Remark:</strong> {participantDetails.remark || 'N/A'}</p>
+                        <p>
+                            <strong>Gender:</strong>{' '}
+                            {isEditing ? (
+                                <input
+                                    type="text"
+                                    value={editedDetails.gender}
+                                    onChange={(e) => handleFieldChange('gender', e.target.value)}
+                                    style={{ width: '50px', padding: '4px' }}
+                                />
+                            ) : (
+                                participantDetails.gender
+                            )}
+                        </p>
+                        <p><strong>Category Rank:</strong> {participantDetails.rank1Cat}</p>
+                        <p><strong>Gender Rank:</strong> {participantDetails.rank1Mix}</p>
+                        <p><strong>Overall Rank:</strong> {participantDetails.rank1Tot}</p>
+                        <p>
+                            <strong>False Start:</strong>{' '}
+                            {isEditing ? (
+                                <input
+                                    type="checkbox"
+                                    checked={editedDetails.fs}
+                                    onChange={(e) => handleFieldChange('fs', e.target.checked)}
+                                />
+                            ) : (
+                                <span style={{ color: participantDetails.fs ? 'red' : 'inherit' }}>
+                                    {participantDetails.fs ? 'True' : 'False'}
+                                </span>
+                            )}
+                        </p>
+                        <p>
+                            <strong>Did Not Start:</strong>{' '}
+                            {isEditing ? (
+                                <input
+                                    type="checkbox"
+                                    checked={editedDetails.dns}
+                                    onChange={(e) => handleFieldChange('dns', e.target.checked)}
+                                />
+                            ) : (
+                                <span style={{ color: participantDetails.dns ? 'red' : 'inherit' }}>
+                                    {participantDetails.dns ? 'True' : 'False'}
+                                </span>
+                            )}
+                        </p>
+                        <p>
+                            <strong>Did Not Finish:</strong>{' '}
+                            {isEditing ? (
+                                <input
+                                    type="checkbox"
+                                    checked={editedDetails.dnf}
+                                    onChange={(e) => handleFieldChange('dnf', e.target.checked)}
+                                />
+                            ) : (
+                                <span style={{ color: participantDetails.dnf ? 'red' : 'inherit' }}>
+                                    {participantDetails.dnf ? 'True' : 'False'}
+                                </span>
+                            )}
+                        </p>
+                        <p>
+                            <strong>NSBF:</strong>{' '}
+                            {isEditing ? (
+                                <input
+                                    type="checkbox"
+                                    checked={editedDetails.nsbf}
+                                    onChange={(e) => handleFieldChange('nsbf', e.target.checked)}
+                                />
+                            ) : (
+                                <span style={{ color: participantDetails.nsbf ? 'red' : 'inherit' }}>
+                                    {participantDetails.nsbf ? 'True' : 'False'}
+                                </span>
+                            )}
+                        </p>
+                        <p>
+                            <strong>No Result:</strong>{' '}
+                            {isEditing ? (
+                                <input
+                                    type="checkbox"
+                                    checked={editedDetails.nr}
+                                    onChange={(e) => handleFieldChange('nr', e.target.checked)}
+                                />
+                            ) : (
+                                <span style={{ color: participantDetails.nr ? 'red' : 'inherit' }}>
+                                    {participantDetails.nr ? 'True' : 'False'}
+                                </span>
+                            )}
+                        </p>
+                        <p>
+                            <strong>Disqualified:</strong>{' '}
+                            {isEditing ? (
+                                <input
+                                    type="checkbox"
+                                    checked={editedDetails.dq}
+                                    onChange={(e) => handleFieldChange('dq', e.target.checked)}
+                                />
+                            ) : (
+                                <span style={{ color: participantDetails.dq ? 'red' : 'inherit' }}>
+                                    {participantDetails.dq ? 'True' : 'False'}
+                                </span>
+                            )}
+                        </p>
+                        <p>
+                            <strong>Remark:</strong>{' '}
+                            {isEditing ? (
+                                <input
+                                    type="text"
+                                    value={editedDetails.remark || ''}
+                                    onChange={(e) => handleFieldChange('remark', e.target.value)}
+                                    style={{ width: '100%', padding: '4px', marginTop: '4px' }}
+                                />
+                            ) : (
+                                participantDetails.remark || 'N/A'
+                            )}
+                        </p>
                     </div>
                     <div style={{
-                        flex: 1, // Allow this div to take up equal space
+                        flex: 1,
                         padding: '16px',
                         background: 'rgba(255, 255, 255, 0.9)',
                         borderRadius: '8px',
                         boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1)'
                     }}>
-                        <p><strong>Time Gun:</strong> {participantDetails.timeGun}</p>
-                        <p><strong>Time Start:</strong> {participantDetails.timeStart}</p>
-                        <p><strong>Time Finish:</strong> {participantDetails.timeFinish}</p>
-                        <p><strong>TimeCP1:</strong> {participantDetails.timeCP1 || '-'}</p>
-                        <p><strong>TimeCP2:</strong> {participantDetails.timeCP2 || '-'}</p>
-                        <p><strong>TimeCP3:</strong> {participantDetails.timeCP3 || '-'}</p>
-                        <p><strong>TimeCP4:</strong> {participantDetails.timeCP4 || '-'}</p>
-                        <p><strong>TimeCP5:</strong> {participantDetails.timeCP5 || '-'}</p>
-                        <p><strong>TimeCP6:</strong> {participantDetails.timeCP6 || '-'}</p>
-                        <p><strong>TimeCP7:</strong> {participantDetails.timeCP7 || '-'}</p>
-                        <p><strong>TimeCP8:</strong> {participantDetails.timeCP8 || '-'}</p>
+                        <p>
+                            <strong>Time Gun:</strong>{' '}
+                            {isEditing ? (
+                                <input
+                                    type="text"
+                                    value={editedDetails.timeGun || ''}
+                                    onChange={(e) => handleFieldChange('timeGun', e.target.value)}
+                                    placeholder="HH:MM:SS"
+                                    style={{ width: '100px', padding: '4px' }}
+                                />
+                            ) : (
+                                participantDetails.timeGun
+                            )}
+                        </p>
+                        <p>
+                            <strong>Time Start:</strong>{' '}
+                            {isEditing ? (
+                                <input
+                                    type="text"
+                                    value={editedDetails.timeStart || ''}
+                                    onChange={(e) => handleFieldChange('timeStart', e.target.value)}
+                                    placeholder="HH:MM:SS"
+                                    style={{ width: '100px', padding: '4px' }}
+                                />
+                            ) : (
+                                participantDetails.timeStart
+                            )}
+                        </p>
+                        <p>
+                            <strong>Time Finish:</strong>{' '}
+                            {isEditing ? (
+                                <input
+                                    type="text"
+                                    value={editedDetails.timeFinish || ''}
+                                    onChange={(e) => handleFieldChange('timeFinish', e.target.value)}
+                                    placeholder="HH:MM:SS"
+                                    style={{ width: '100px', padding: '4px' }}
+                                />
+                            ) : (
+                                participantDetails.timeFinish
+                            )}
+                        </p>
+                        <p>
+                            <strong>TimeCP1:</strong>{' '}
+                            {isEditing ? (
+                                <input
+                                    type="text"
+                                    value={editedDetails.timeCP1 || ''}
+                                    onChange={(e) => handleFieldChange('timeCP1', e.target.value)}
+                                    placeholder="HH:MM:SS"
+                                    style={{ width: '100px', padding: '4px' }}
+                                />
+                            ) : (
+                                participantDetails.timeCP1 || '-'
+                            )}
+                        </p>
+                        <p>
+                            <strong>TimeCP2:</strong>{' '}
+                            {isEditing ? (
+                                <input
+                                    type="text"
+                                    value={editedDetails.timeCP2 || ''}
+                                    onChange={(e) => handleFieldChange('timeCP2', e.target.value)}
+                                    placeholder="HH:MM:SS"
+                                    style={{ width: '100px', padding: '4px' }}
+                                />
+                            ) : (
+                                participantDetails.timeCP2 || '-'
+                            )}
+                        </p>
+                        <p>
+                            <strong>TimeCP3:</strong>{' '}
+                            {isEditing ? (
+                                <input
+                                    type="text"
+                                    value={editedDetails.timeCP3 || ''}
+                                    onChange={(e) => handleFieldChange('timeCP3', e.target.value)}
+                                    placeholder="HH:MM:SS"
+                                    style={{ width: '100px', padding: '4px' }}
+                                />
+                            ) : (
+                                participantDetails.timeCP3 || '-'
+                            )}
+                        </p>
+                        <p>
+                            <strong>TimeCP4:</strong>{' '}
+                            {isEditing ? (
+                                <input
+                                    type="text"
+                                    value={editedDetails.timeCP4 || ''}
+                                    onChange={(e) => handleFieldChange('timeCP4', e.target.value)}
+                                    placeholder="HH:MM:SS"
+                                    style={{ width: '100px', padding: '4px' }}
+                                />
+                            ) : (
+                                participantDetails.timeCP4 || '-'
+                            )}
+                        </p>
+                        <p>
+                            <strong>TimeCP5:</strong>{' '}
+                            {isEditing ? (
+                                <input
+                                    type="text"
+                                    value={editedDetails.timeCP5 || ''}
+                                    onChange={(e) => handleFieldChange('timeCP5', e.target.value)}
+                                    placeholder="HH:MM:SS"
+                                    style={{ width: '100px', padding: '4px' }}
+                                />
+                            ) : (
+                                participantDetails.timeCP5 || '-'
+                            )}
+                        </p>
+                        <p>
+                            <strong>TimeCP6:</strong>{' '}
+                            {isEditing ? (
+                                <input
+                                    type="text"
+                                    value={editedDetails.timeCP6 || ''}
+                                    onChange={(e) => handleFieldChange('timeCP6', e.target.value)}
+                                    placeholder="HH:MM:SS"
+                                    style={{ width: '100px', padding: '4px' }}
+                                />
+                            ) : (
+                                participantDetails.timeCP6 || '-'
+                            )}
+                        </p>
+                        <p>
+                            <strong>TimeCP7:</strong>{' '}
+                            {isEditing ? (
+                                <input
+                                    type="text"
+                                    value={editedDetails.timeCP7 || ''}
+                                    onChange={(e) => handleFieldChange('timeCP7', e.target.value)}
+                                    placeholder="HH:MM:SS"
+                                    style={{ width: '100px', padding: '4px' }}
+                                />
+                            ) : (
+                                participantDetails.timeCP7 || '-'
+                            )}
+                        </p>
+                        <p>
+                            <strong>TimeCP8:</strong>{' '}
+                            {isEditing ? (
+                                <input
+                                    type="text"
+                                    value={editedDetails.timeCP8 || ''}
+                                    onChange={(e) => handleFieldChange('timeCP8', e.target.value)}
+                                    placeholder="HH:MM:SS"
+                                    style={{ width: '100px', padding: '4px' }}
+                                />
+                            ) : (
+                                participantDetails.timeCP8 || '-'
+                            )}
+                        </p>
                     </div>
+                </div>
+                <div style={{ 
+                    marginTop: '16px', 
+                    display: 'flex', 
+                    gap: '8px', 
+                    justifyContent: 'flex-end' 
+                }}>
+                    {isEditing ? (
+                        <>
+                            <button
+                                onClick={handleSaveDetails}
+                                disabled={saving}
+                                style={{
+                                    padding: '8px 16px',
+                                    background: '#4CAF50',
+                                    color: '#fff',
+                                    border: 'none',
+                                    borderRadius: '4px',
+                                    cursor: saving ? 'not-allowed' : 'pointer',
+                                    opacity: saving ? 0.6 : 1
+                                }}
+                            >
+                                {saving ? 'Saving...' : 'Save'}
+                            </button>
+                            <button
+                                onClick={handleCancelEdit}
+                                disabled={saving}
+                                style={{
+                                    padding: '8px 16px',
+                                    background: '#f44336',
+                                    color: '#fff',
+                                    border: 'none',
+                                    borderRadius: '4px',
+                                    cursor: saving ? 'not-allowed' : 'pointer',
+                                    opacity: saving ? 0.6 : 1
+                                }}
+                            >
+                                Cancel
+                            </button>
+                        </>
+                    ) : (
+                        <button
+                            onClick={() => setIsEditing(true)}
+                            style={{
+                                padding: '8px 16px',
+                                background: '#2196F3',
+                                color: '#fff',
+                                border: 'none',
+                                borderRadius: '4px',
+                                cursor: 'pointer'
+                            }}
+                        >
+                            Edit
+                        </button>
+                    )}
                 </div>
                 </div>
             ) : (

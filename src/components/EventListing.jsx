@@ -19,6 +19,12 @@ const EventListing = () => {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const [showDeleteSuccess, setShowDeleteSuccess] = useState(false);
+    
+    // Filter states
+    const [filterName, setFilterName] = useState('');
+    const [filterLocation, setFilterLocation] = useState('');
+    const [filterCountry, setFilterCountry] = useState('');
+    const [filterYear, setFilterYear] = useState('');
 
     // For create event modal
     const [showCreate, setShowCreate] = useState(false);
@@ -48,7 +54,11 @@ const EventListing = () => {
             return res.json();
         })
         .then(data => {
-            setEvents(data);
+            // Sort by date descending (newer first)
+            const sortedData = Array.isArray(data) 
+                ? data.sort((a, b) => new Date(b.eventDt) - new Date(a.eventDt))
+                : [];
+            setEvents(sortedData);
             setLoading(false);
         })
         .catch(err => {
@@ -108,12 +118,119 @@ const handleDelete = (eventId) => {
         navigate(`/event/${eventId}`);
     };
 
+    // Filter events
+    const filteredEvents = Array.isArray(events) ? events.filter(event => {
+        const matchName = !filterName || event.name.toLowerCase().includes(filterName.toLowerCase());
+        const matchLocation = !filterLocation || event.location.toLowerCase().includes(filterLocation.toLowerCase());
+        const matchCountry = !filterCountry || event.country.toLowerCase().includes(filterCountry.toLowerCase());
+        const matchYear = !filterYear || new Date(event.eventDt).getFullYear().toString() === filterYear;
+        return matchName && matchLocation && matchCountry && matchYear;
+    }) : [];
+
+    // Get unique years for filter dropdown
+    const availableYears = Array.isArray(events) 
+        ? [...new Set(events.map(e => new Date(e.eventDt).getFullYear()))].sort((a, b) => b - a)
+        : [];
+
     if (loading) return <div>Loading events...</div>;
     if (error) return <div>Error: {error}</div>;
 
     return (
         <div className="event-listing-container">
             <h1>Event Listing</h1>
+            
+            {/* Filter Section */}
+            <div style={{
+                background: '#f5f5f5',
+                padding: '16px',
+                borderRadius: '8px',
+                marginBottom: '16px',
+                display: 'flex',
+                gap: '12px',
+                flexWrap: 'wrap',
+                alignItems: 'center'
+            }}>
+                <div style={{ flex: '1 1 200px' }}>
+                    <input
+                        type="text"
+                        placeholder="Filter by name..."
+                        value={filterName}
+                        onChange={e => setFilterName(e.target.value)}
+                        style={{
+                            width: '100%',
+                            padding: '8px 12px',
+                            border: '1px solid #ddd',
+                            borderRadius: '4px'
+                        }}
+                    />
+                </div>
+                <div style={{ flex: '1 1 200px' }}>
+                    <input
+                        type="text"
+                        placeholder="Filter by location..."
+                        value={filterLocation}
+                        onChange={e => setFilterLocation(e.target.value)}
+                        style={{
+                            width: '100%',
+                            padding: '8px 12px',
+                            border: '1px solid #ddd',
+                            borderRadius: '4px'
+                        }}
+                    />
+                </div>
+                <div style={{ flex: '1 1 150px' }}>
+                    <input
+                        type="text"
+                        placeholder="Filter by country..."
+                        value={filterCountry}
+                        onChange={e => setFilterCountry(e.target.value)}
+                        style={{
+                            width: '100%',
+                            padding: '8px 12px',
+                            border: '1px solid #ddd',
+                            borderRadius: '4px'
+                        }}
+                    />
+                </div>
+                <div style={{ flex: '1 1 120px' }}>
+                    <select
+                        value={filterYear}
+                        onChange={e => setFilterYear(e.target.value)}
+                        style={{
+                            width: '100%',
+                            padding: '8px 12px',
+                            border: '1px solid #ddd',
+                            borderRadius: '4px'
+                        }}
+                    >
+                        <option value="">All Years</option>
+                        {availableYears.map(year => (
+                            <option key={year} value={year}>{year}</option>
+                        ))}
+                    </select>
+                </div>
+                {(filterName || filterLocation || filterCountry || filterYear) && (
+                    <button
+                        onClick={() => {
+                            setFilterName('');
+                            setFilterLocation('');
+                            setFilterCountry('');
+                            setFilterYear('');
+                        }}
+                        style={{
+                            padding: '8px 16px',
+                            background: '#6c757d',
+                            color: '#fff',
+                            border: 'none',
+                            borderRadius: '4px',
+                            cursor: 'pointer'
+                        }}
+                    >
+                        Clear Filters
+                    </button>
+                )}
+            </div>
+            
             <div className="event-table-container">
                 <table className="event-table">
                     <thead>
@@ -126,63 +243,73 @@ const handleDelete = (eventId) => {
                         </tr>
                     </thead>
                     <tbody>
-                        {Array.isArray(events) && events.map(event => (
-                            <tr
-                                key={event.id}
-                                style={{ cursor: 'pointer' }}
-                                onClick={e => {
-                                    // Prevent row click if clicking a button
-                                    if (e.target.tagName === 'BUTTON') return;
-                                    handleRowClick(event.id);
-                                }}
-                            >
-                                <td>{event.name}</td>
-                                <td>{formatDate(event.eventDt)}</td>
-                                <td>{event.location}</td>
-                                <td>{event.country}</td>
-                                <td className="action-col" style={{ display: 'flex', gap: '8px', justifyContent: 'center' }}>
-                                    <button
-                                        style={{
-                                            background: '#28a745',
-                                            color: '#fff',
-                                            border: 'none',
-                                            borderRadius: '4px',
-                                            padding: '6px 12px',
-                                            cursor: 'pointer'
-                                        }}
-                                        onClick={() => navigate(`/racesetup/${event.id}`)}
-                                    >
-                                        Race Setup
-                                    </button>
-                                    <button
-                                        style={{
-                                            background: '#007bff',
-                                            color: '#fff',
-                                            border: 'none',
-                                            borderRadius: '4px',
-                                            padding: '6px 12px',
-                                            cursor: 'pointer'
-                                        }}
-                                        onClick={() => navigate(`/topevent/${event.id}/B`)}
-                                    >
-                                        Top Event Page
-                                    </button>
-                                    <button
-                                        style={{
-                                            background: '#c00',
-                                            color: '#fff',
-                                            border: 'none',
-                                            borderRadius: '4px',
-                                            padding: '6px 12px',
-                                            cursor: 'pointer'
-                                        }}
-                                        onClick={() => handleDelete(event.id)}
-                                    >
-                                        Delete
-                                    </button>
+                        {filteredEvents.length === 0 ? (
+                            <tr>
+                                <td colSpan="5" style={{ textAlign: 'center', padding: '24px', color: '#999' }}>
+                                    {Array.isArray(events) && events.length > 0 
+                                        ? 'No events match the filter criteria'
+                                        : 'No events found'}
                                 </td>
                             </tr>
-                        ))}
+                        ) : (
+                            filteredEvents.map(event => (
+                                <tr
+                                    key={event.id}
+                                    style={{ cursor: 'pointer' }}
+                                    onClick={e => {
+                                        // Prevent row click if clicking a button
+                                        if (e.target.tagName === 'BUTTON') return;
+                                        handleRowClick(event.id);
+                                    }}
+                                >
+                                    <td>{event.name}</td>
+                                    <td>{formatDate(event.eventDt)}</td>
+                                    <td>{event.location}</td>
+                                    <td>{event.country}</td>
+                                    <td className="action-col" style={{ display: 'flex', gap: '8px', justifyContent: 'center' }}>
+                                        <button
+                                            style={{
+                                                background: '#28a745',
+                                                color: '#fff',
+                                                border: 'none',
+                                                borderRadius: '4px',
+                                                padding: '6px 12px',
+                                                cursor: 'pointer'
+                                            }}
+                                            onClick={() => navigate(`/racesetup/${event.id}`)}
+                                        >
+                                            Race Setup
+                                        </button>
+                                        <button
+                                            style={{
+                                                background: '#007bff',
+                                                color: '#fff',
+                                                border: 'none',
+                                                borderRadius: '4px',
+                                                padding: '6px 12px',
+                                                cursor: 'pointer'
+                                            }}
+                                            onClick={() => navigate(`/topevent/${event.id}/B`)}
+                                        >
+                                            Top Event Page
+                                        </button>
+                                        <button
+                                            style={{
+                                                background: '#c00',
+                                                color: '#fff',
+                                                border: 'none',
+                                                borderRadius: '4px',
+                                                padding: '6px 12px',
+                                                cursor: 'pointer'
+                                            }}
+                                            onClick={() => handleDelete(event.id)}
+                                        >
+                                            Delete
+                                        </button>
+                                    </td>
+                                </tr>
+                            ))
+                        )}
                     </tbody>
                 </table>
                 <div style={{ marginTop: '16px', textAlign: 'right' }}>

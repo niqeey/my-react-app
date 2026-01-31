@@ -2,6 +2,7 @@ import React, { useEffect, useState, useRef } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import PageWrapper from './PageWrapper';
 import apiBase from '../apiBase';
+import { authFetch } from '../utils/authFetch';
 
 const columnDisplayNames = {
     cat: 'Cat',
@@ -38,12 +39,15 @@ const StatisticPage = () => {
 
         const fetchData = async () => {
             setLoading(true);
-            const response = await fetch(`${apiBase}/statistic/full`, {
+            console.log('Fetching statistics for eventId:', eventId);
+            const response = await authFetch(`${apiBase}/statistic/full`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ eventId })
             });
             const result = await response.json();
+            console.log('Statistics response:', result);
+            console.log('Is array?', Array.isArray(result), 'Length:', result?.length);
             if (isMounted) setData(result);
             setLoading(false);
         };
@@ -75,7 +79,7 @@ const StatisticPage = () => {
     const handleReload = () => {
         setCountdown(10000);
         setLoading(true);
-        fetch(`${apiBase}/statistic/full`, {
+        authFetch(`${apiBase}/statistic/full`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ eventId })
@@ -86,7 +90,7 @@ const StatisticPage = () => {
     };
 
     // Group data by distance
-    const groupedData = data.reduce((acc, row) => {
+    const groupedData = (Array.isArray(data) ? data : []).reduce((acc, row) => {
         let dist = row.distance;
         if (dist === null || dist === undefined || dist === '') dist = 'ALL';
         if (!acc[dist]) acc[dist] = [];
@@ -109,7 +113,7 @@ const StatisticPage = () => {
 
     const fetchPopupData = async (endpoint, title) => {
         try {
-            const response = await fetch(`${apiBase}${endpoint}`, {
+            const response = await authFetch(`${apiBase}${endpoint}`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ eventId }),
@@ -170,14 +174,14 @@ const StatisticPage = () => {
                     onClick={handleReload}
                     style={{
                         marginLeft: 16,
-                        padding: '4px 16px',
+                        padding: '8px 16px',
                         fontSize: 15,
                         borderRadius: 4,
-                        border: '1px solid #4fc3f7',
-                        background: '#fff',
-                        color: '#1976d2',
+                        border: '1px solid #ddd',
+                        background: '#007bff',
+                        color: '#fff',
                         cursor: 'pointer',
-                        fontWeight: 500,
+                        fontWeight: 600,
                         height: 36
                     }}
                 >
@@ -239,9 +243,8 @@ const StatisticPage = () => {
                         fontSize: 15
                     }}>
                         <colgroup>
-                            <col style={{ width: '5%', minWidth: '40px', maxWidth: '60px' }} /> {/* cat column */}
-                            <col style={{ width: '20%', minWidth: '160px', maxWidth: '300px' }} /> {/* category column */}
-                            {/* The rest will auto-distribute */}
+                            <col style={{ width: '5%', minWidth: '40px', maxWidth: '60px' }} />
+                            <col style={{ width: '20%', minWidth: '160px', maxWidth: '300px' }} />
                         </colgroup>
                         <thead>
                             <tr>
@@ -273,7 +276,7 @@ const StatisticPage = () => {
                                             <th key={col} style={{
                                                 background: '#e3f0ff',
                                                 padding: '12px 6px',
-                                                border: '1px solid #ccc',
+                                                border: '1px solid #ddd',
                                                 fontWeight: 600,
                                                 color: '#007bff',
                                                 textAlign: 'center',
@@ -292,7 +295,7 @@ const StatisticPage = () => {
                                         <th key={col} style={{
                                             background: '#e3f0ff',
                                             padding: '12px 6px',
-                                            border: '1px solid #ccc',
+                                            border: '1px solid #ddd',
                                             fontWeight: 600,
                                             color: '#234',
                                             textAlign: col === 'category' ? 'left' : 'center',

@@ -27,14 +27,16 @@ const RaceSetup = () => {
     const [categories, setCategories] = useState([]);
     const [loading, setLoading] = useState(true);
     const [showModal, setShowModal] = useState(false);
+    const [uploadStatus, setUploadStatus] = useState(null); // For upload feedback
     const [newCat, setNewCat] = useState({
-        name: '',
+        category: '',
         cat: '',
         distance: 10,
         gender: 'M',
         raceMode: 'OFFICIAL',
         toplist: 10,
-        isresult: 1
+        isresult: 1,
+        islive: 0
     });
     const [cpList, setCpList] = useState(Array(10).fill(''));
     const [editingCp, setEditingCp] = useState({}); // { [catId]: [cp1, cp2, ...] }
@@ -119,6 +121,29 @@ const RaceSetup = () => {
             return next;
         });
     };
+    
+    const handleCsvUpload = async (catId, cat, file) => {
+        // Show processing status immediately
+        setUploadStatus({ type: 'processing', message: 'Processing CSV file...', catId });
+        
+        const formData = new FormData();
+        formData.append('file', file);
+        formData.append('eventId', eventId);
+        formData.append('cat', cat);
+        
+        try {
+            const res = await authFetch(`${apiBase}/race/category/upload-csv`, {
+                method: 'POST',
+                body: formData
+            });
+            const data = await res.json();
+            setUploadStatus({ type: 'success', message: data.message, catId });
+            setTimeout(() => setUploadStatus(null), 5000);
+        } catch (err) {
+            setUploadStatus({ type: 'error', message: err.message || 'Upload failed', catId });
+            setTimeout(() => setUploadStatus(null), 5000);
+        }
+    };
 
     if (loading) return <div>Loading categories...</div>;
 
@@ -133,6 +158,49 @@ const RaceSetup = () => {
     return (
         <div style={containerStyle}>
             <h1 style={{ marginBottom: 24 }}>{eventName}</h1>
+            
+            {/* CSV Upload Instructions */}
+            <div style={{
+                background: '#e3f2fd',
+                border: '1px solid #90caf9',
+                borderRadius: '8px',
+                padding: '16px',
+                marginBottom: '24px'
+            }}>
+                <h3 style={{ margin: '0 0 12px 0', color: '#1976d2', fontSize: '1.1rem' }}>
+                    📄 CSV Upload Instructions
+                </h3>
+                <div style={{ fontSize: '0.95rem', lineHeight: '1.6', color: '#333' }}>
+                    <p style={{ margin: '0 0 8px 0' }}>
+                        <strong>CSV Format:</strong> The file must have 4 or 5 columns in this order:
+                    </p>
+                    <p style={{ 
+                        margin: '0 0 8px 0', 
+                        background: '#fff', 
+                        padding: '8px 12px', 
+                        borderRadius: '4px',
+                        fontFamily: 'monospace',
+                        fontSize: '0.9rem'
+                    }}>
+                        pid, chipcode, bib, name, sex
+                    </p>
+                    <ul style={{ margin: '0', paddingLeft: '24px' }}>
+                        <li><strong>pid:</strong> Participant ID (set to <code style={{background: '#ffebee', padding: '2px 6px', borderRadius: '3px', color: '#c62828'}}>0</code> to delete an existing participant)</li>
+                        <li><strong>chipcode:</strong> Chip/RFID code for timing</li>
+                        <li><strong>bib:</strong> Bib number (used to match existing participants)</li>
+                        <li><strong>name:</strong> Participant name</li>
+                        <li><strong>sex:</strong> M or F (optional, for mixed categories)</li>
+                    </ul>
+                    <p style={{ margin: '12px 0 0 0', color: '#666', fontSize: '0.9rem' }}>
+                        ℹ️ <em>
+                            <strong>Update:</strong> Existing bib numbers will have name and chipcode updated. <br/>
+                            <strong>Insert:</strong> New bib numbers will be added as new participants. <br/>
+                            <strong>Delete:</strong> Set pid to 0 for an existing bib to remove that participant.
+                        </em>
+                    </p>
+                </div>
+            </div>
+            
             <h2 style={{ marginBottom: 16, fontSize: '1.2rem', color: '#444' }}>Categories</h2>
             <div>
                 {categories.map(cat => {
@@ -169,6 +237,7 @@ const RaceSetup = () => {
                                             >
                                                 <option value="M">Men</option>
                                                 <option value="F">Women</option>
+                                                <option value="X">Mixed</option>
                                             </select>
                                         </label>
                                         &nbsp;|&nbsp;
@@ -219,7 +288,7 @@ const RaceSetup = () => {
                                             Distance: {cat.distance}KM
                                         </span>
                                         <span style={{display: 'inline-block', minWidth: 150}}>
-                                            Gender: {cat.gender === 'M' ? "Men" : "Women"}
+                                            Gender: {cat.gender === 'M' ? "Men" : cat.gender === 'F' ? "Women" : "Mixed"}
                                         </span>
                                         <span style={{display: 'inline-block', minWidth: 170}}>
                                             Mode: {cat.raceMode}
@@ -263,7 +332,7 @@ const RaceSetup = () => {
                                                 const toplist = editingCp[cat.catId + '_toplist'] ?? cat.toplist;
                                                 const isresult = editingCp[cat.catId + '_isresult'] ?? cat.isresult;
                                                 try {
-                                                    await authFetch('/race/category/update', {
+                                                    await authFetch(`${apiBase}/race/category/update`, {
                                                         method: 'POST',
                                                         headers: { 'Content-Type': 'application/json' },
                                                         body: JSON.stringify({
@@ -278,7 +347,7 @@ const RaceSetup = () => {
                                                         })
                                                     });
                                                     // Refresh categories
-                                                    const res = await authFetch('/race/categories', {
+                                                    const res = await authFetch(`${apiBase}/race/categories`, {
                                                         method: 'POST',
                                                         headers: { 'Content-Type': 'application/json' },
                                                         body: JSON.stringify({ eventId })
@@ -334,7 +403,7 @@ const RaceSetup = () => {
                                                 <span style={{color:'#aaa'}}>No CP</span>
                                             )}
                                         </div>
-                                        <div style={{marginLeft: 'auto'}}>
+                                        <div style={{marginLeft: 'auto', display: 'flex', gap: 8}}>
                                             <button
                                                 onClick={() => startEditCp(cat.catId, cat.checkpointlist)}
                                                 style={{
@@ -344,13 +413,97 @@ const RaceSetup = () => {
                                                     padding: '6px 16px',
                                                     borderRadius: 5,
                                                     cursor: 'pointer',
-                                                    marginLeft: 12,
                                                     minWidth: 70
                                                 }}
                                             >Edit</button>
+                                            <button
+                                                onClick={async () => {
+                                                    if (window.confirm(`Are you sure you want to delete category "${cat.cat}"? This action cannot be undone.`)) {
+                                                        try {
+                                                            const res = await authFetch(`${apiBase}/race/category?id=${cat.catId}`, {
+                                                                method: 'DELETE',
+                                                                headers: {
+                                                                    'Content-Type': 'application/json'
+                                                                }
+                                                            });
+                                                            if (!res.ok) {
+                                                                const errorText = await res.text();
+                                                                throw new Error(errorText || 'Failed to delete category');
+                                                            }
+                                                            // Refresh categories after deletion
+                                                            const res2 = await authFetch(`${apiBase}/race/categories`, {
+                                                                method: 'POST',
+                                                                headers: {
+                                                                    'Content-Type': 'application/json'
+                                                                },
+                                                                body: JSON.stringify({ eventId })
+                                                            });
+                                                            const data = await res2.json();
+                                                            setCategories(data);
+                                                            alert('Category deleted successfully');
+                                                        } catch (err) {
+                                                            alert('Failed to delete category: ' + err.message);
+                                                        }
+                                                    }
+                                                }}
+                                                style={{
+                                                    background: '#fff',
+                                                    color: '#d32f2f',
+                                                    border: '1px solid #d32f2f',
+                                                    padding: '6px 16px',
+                                                    borderRadius: 5,
+                                                    cursor: 'pointer',
+                                                    minWidth: 70
+                                                }}
+                                            >Delete</button>
                                         </div>
                                     </div>
                                 )}
+                            </div>
+                            
+                            {/* CSV Upload Section */}
+                            <div style={{ marginTop: 16, paddingTop: 16, borderTop: '1px solid #e0e0e0' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                                    <label style={{
+                                        display: 'inline-block',
+                                        padding: '8px 16px',
+                                        background: '#4caf50',
+                                        color: '#fff',
+                                        borderRadius: '5px',
+                                        cursor: 'pointer',
+                                        fontSize: '0.95rem'
+                                    }}>
+                                        📤 Upload Participants CSV
+                                        <input
+                                            type="file"
+                                            accept=".csv"
+                                            style={{ display: 'none' }}
+                                            onChange={(e) => {
+                                                const file = e.target.files[0];
+                                                if (file) {
+                                                    handleCsvUpload(cat.catId, cat.cat, file);
+                                                }
+                                                e.target.value = null; // Reset input
+                                            }}
+                                        />
+                                    </label>
+                                    {uploadStatus && uploadStatus.catId === cat.catId && (
+                                        <span style={{
+                                            padding: '6px 12px',
+                                            borderRadius: '4px',
+                                            fontSize: '0.9rem',
+                                            background: uploadStatus.type === 'success' ? '#d4edda' : 
+                                                       uploadStatus.type === 'error' ? '#f8d7da' : '#fff3cd',
+                                            color: uploadStatus.type === 'success' ? '#155724' : 
+                                                   uploadStatus.type === 'error' ? '#721c24' : '#856404',
+                                            border: uploadStatus.type === 'success' ? '1px solid #c3e6cb' : 
+                                                    uploadStatus.type === 'error' ? '1px solid #f5c6cb' : '1px solid #ffeaa7'
+                                        }}>
+                                            {uploadStatus.type === 'processing' && '⏳ '}
+                                            {uploadStatus.message}
+                                        </span>
+                                    )}
+                                </div>
                             </div>
                         </div>
                     );
@@ -395,7 +548,7 @@ const RaceSetup = () => {
                 &nbsp;|&nbsp;
                 <label>
                     Name:&nbsp;
-                    <input name="name" value={newCat.name} onChange={handleNewCatChange} style={{width:200}} />
+                    <input name="category" value={newCat.category} onChange={handleNewCatChange} style={{width:200}} />
                 </label>
             </div>
             <div style={{marginBottom:12}}>
@@ -413,6 +566,7 @@ const RaceSetup = () => {
                     <select name="gender" value={newCat.gender} onChange={handleNewCatChange}>
                         <option value="M">Men</option>
                         <option value="F">Women</option>
+                        <option value="X">Mixed</option>
                     </select>
                 </label>
             </div>
@@ -474,14 +628,14 @@ const RaceSetup = () => {
                         try {
                             // Combine selected CPs in order, skip blanks
                             const checkpointlist = cpList.filter(Boolean).join(',');
-                            await authFetch('/race/category/create', {
+                            await authFetch(`${apiBase}/race/category/create`, {
                                 method: 'POST',
                                 headers: { 'Content-Type': 'application/json' },
                                 body: JSON.stringify({ eventId, ...newCat, checkpointlist })
                             });
                             setShowModal(false);
                             // Refresh categories
-                            const res = await authFetch('/race/categories', {
+                            const res = await authFetch(`${apiBase}/race/categories`, {
                                 method: 'POST',
                                 headers: { 'Content-Type': 'application/json' },
                                 body: JSON.stringify({ eventId })
@@ -490,13 +644,14 @@ const RaceSetup = () => {
                             setCategories(data);
                             // Reset form
                             setNewCat({
-                                name: '',
+                                category: '',
                                 cat: '',
                                 distance: 10,
                                 gender: 'M',
                                 raceMode: 'OFFICIAL',
                                 toplist: 10,
-                                isresult: 1
+                                isresult: 1,
+                                islive: 0
                             });
                             setCpList(Array(10).fill(''));
                         } catch (err) {
