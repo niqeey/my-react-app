@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { authFetch } from '../utils/authFetch';
 import apiBase from '../apiBase';
 
 const EventSetup = () => {
@@ -6,7 +7,7 @@ const EventSetup = () => {
 
     useEffect(() => {
         // Replace with your microservice endpoint
-        fetch(`${apiBase}/api/event-setup`)
+        authFetch(`${apiBase}/api/event-setup`)
             .then(res => res.json())
             .then(setData)
             .catch(console.error);

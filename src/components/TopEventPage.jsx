@@ -64,7 +64,7 @@ const TopEventPage = () => {
         if (!selectedCat) return;
         setCatDetailLoading(true);
         setCatDetail(null);
-        fetch(`${apiBase}/report/event/category/top`, {
+        authFetch(`${apiBase}/report/event/category/top`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
