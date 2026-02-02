@@ -75,7 +75,48 @@ const Disqualified = () => {
                 margin: 0,
                 flex: 1
             }}> {eventName}</h1>
-            <h2>Disqualified Participants</h2>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 16 }}>
+                <h2>Disqualified Participants</h2>
+                <button
+                    onClick={async () => {
+                        try {
+                            const res = await authFetch(`${apiBase}/report/event/dq/xlsx`, {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ eventId })
+                            });
+                            if (!res.ok) {
+                                alert('Failed to download Excel file.');
+                                return;
+                            }
+                            const blob = await res.blob();
+                            const url = window.URL.createObjectURL(blob);
+                            const a = document.createElement('a');
+                            a.href = url;
+                            a.download = `${eventName || 'event'}_disqualified.xlsx`;
+                            document.body.appendChild(a);
+                            a.click();
+                            a.remove();
+                            window.URL.revokeObjectURL(url);
+                        } catch (err) {
+                            console.error('Download error:', err);
+                            alert('Error downloading file.');
+                        }
+                    }}
+                    style={{
+                        background: '#007bff',
+                        color: '#fff',
+                        border: 'none',
+                        borderRadius: 6,
+                        padding: '10px 28px',
+                        fontWeight: 'bold',
+                        fontSize: 16,
+                        cursor: 'pointer'
+                    }}
+                >
+                    Download
+                </button>
+            </div>
             {loading ? (
                 <p>Loading...</p>
             ) : (

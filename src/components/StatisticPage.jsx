@@ -171,6 +171,47 @@ const StatisticPage = () => {
                     Statistic {eventName}
                 </h1>
                 <button
+                    onClick={async () => {
+                        try {
+                            const res = await authFetch(`${apiBase}/report/event/statistic/xlsx`, {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ eventId })
+                            });
+                            if (!res.ok) {
+                                alert('Failed to download Excel file.');
+                                return;
+                            }
+                            const blob = await res.blob();
+                            const url = window.URL.createObjectURL(blob);
+                            const a = document.createElement('a');
+                            a.href = url;
+                            a.download = `${eventName || 'event'}_statistic.xlsx`;
+                            document.body.appendChild(a);
+                            a.click();
+                            a.remove();
+                            window.URL.revokeObjectURL(url);
+                        } catch (err) {
+                            console.error('Download error:', err);
+                            alert('Error downloading file.');
+                        }
+                    }}
+                    style={{
+                        marginLeft: 16,
+                        padding: '8px 16px',
+                        fontSize: 15,
+                        borderRadius: 4,
+                        border: '1px solid #ddd',
+                        background: '#28a745',
+                        color: '#fff',
+                        cursor: 'pointer',
+                        fontWeight: 600,
+                        height: 36
+                    }}
+                >
+                    Download
+                </button>
+                <button
                     onClick={handleReload}
                     style={{
                         marginLeft: 16,

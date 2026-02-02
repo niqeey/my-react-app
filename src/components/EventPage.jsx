@@ -23,6 +23,13 @@ const EventPage = () => {
     const [editedDetails, setEditedDetails] = useState(null);
     const [saving, setSaving] = useState(false);
     
+    // State for Overall and Gender Rank tabs
+    const [viewMode, setViewMode] = useState('category'); // 'category' | 'overall' | 'gender'
+    const [selectedDistance, setSelectedDistance] = useState('');
+    const [selectedGender, setSelectedGender] = useState('M');
+    const [rankData, setRankData] = useState([]);
+    const [rankDataLoading, setRankDataLoading] = useState(false);
+    
     // Load categories
     useEffect(() => {
         authFetch(`${apiBase}/race/categories`, {
@@ -80,6 +87,55 @@ const EventPage = () => {
         window.addEventListener('resize', handleResize);
         return () => window.removeEventListener('resize', handleResize);
     }, []);
+
+    // Fetch Overall or Gender Rank data
+    useEffect(() => {
+        if (viewMode === 'category') return;
+        if (!selectedDistance) return;
+        if (viewMode === 'gender' && !selectedGender) return; // Only proceed if gender is selected
+        
+        setRankDataLoading(true);
+        setRankData([]);
+        
+        if (viewMode === 'overall') {
+            authFetch(`${apiBase}/report/event/overall-rank`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    eventId,
+                    distance: selectedDistance
+                })
+            })
+            .then(res => res.json())
+            .then(data => {
+                setRankData(data);
+                setRankDataLoading(false);
+            })
+            .catch(() => {
+                setRankData([]);
+                setRankDataLoading(false);
+            });
+        } else if (viewMode === 'gender') {
+            authFetch(`${apiBase}/report/event/gender-rank`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    eventId,
+                    distance: selectedDistance,
+                    gender: selectedGender
+                })
+            })
+            .then(res => res.json())
+            .then(data => {
+                setRankData(data);
+                setRankDataLoading(false);
+            })
+            .catch(() => {
+                setRankData([]);
+                setRankDataLoading(false);
+            });
+        }
+    }, [viewMode, selectedDistance, selectedGender, eventId]); // eslint-disable-line react-hooks/exhaustive-deps
 
     const fetchParticipantDetails = async () => {
         if (!bibInput.trim()) {
@@ -179,44 +235,90 @@ const EventPage = () => {
 
     // Column display name mapping
 const columnDisplayNames = {
-    rank1Cat: 'Rank',
+    rank1Cat: 'Cat Rank',
+    rank1Tot: 'Overall',
+    rank1Mix: 'Gender',
     bib: 'Bib',
     name: 'Name',
+    cat: 'Category',
     timeStart: 'TimeStart',
     timeFinish: 'TimeFinish',
     officialTime: 'OfficialTime',
     netTime: 'NetTime',
 };
 
-// Get dynamic columns based on cplist
+// Get dynamic columns based on view mode
 let columns = [];
-if (Array.isArray(catDetail) && catDetail.length > 0) {
-    // Always show these columns first
-    columns = [
-        'rank1Cat', 'bib', 'name', 'officialTime', 'netTime', 'timeStart'
-    ];
+let displayData = [];
 
-    // Parse cplist for CP columns
-    const cplist = catDetail[0].cplist
-        ? catDetail[0].cplist.split(',').map(cp => cp.trim().replace('Time', 'time')) // Convert "TimeCP1" to "timeCP1"
-        : [];
+if (viewMode === 'category') {
+    displayData = catDetail;
+    if (Array.isArray(catDetail) && catDetail.length > 0) {
+        // Always show these columns first
+        columns = [
+            'rank1Cat', 'bib', 'name', 'officialTime', 'netTime', 'timeStart'
+        ];
 
-    // console.log('Raw cplist:', catDetail[0].cplist); // Debugging
-    // console.log('Processed cplist:', cplist); // Debugging
+        // Parse cplist for CP columns
+        const cplist = catDetail[0].cplist
+            ? catDetail[0].cplist.split(',').map(cp => cp.trim().replace('Time', 'time')) // Convert "TimeCP1" to "timeCP1"
+            : [];
 
-    // Dynamically rename timeCP columns
-    const availableTimeCPs = cplist.filter(cp => /^timeCP\d+$/.test(cp)); // Ensure valid timeCP keys
-    // console.log('Available TimeCPs:', availableTimeCPs); // Debugging
+        // Dynamically rename timeCP columns
+        const availableTimeCPs = cplist.filter(cp => /^timeCP\d+$/.test(cp)); // Ensure valid timeCP keys
+        availableTimeCPs.forEach((key, index) => {
+            columnDisplayNames[key] = `Split_${index + 1}`;
+            if (!columns.includes(key)) columns.push(key); // Add to columns if not already present
+        });
 
-    availableTimeCPs.forEach((key, index) => {
-        columnDisplayNames[key] = `Split_${index + 1}`;
-        // console.log(`Renaming ${key} to Split_${index + 1}`); // Debugging output
-        if (!columns.includes(key)) columns.push(key); // Add to columns if not already present
-    });
-
-    // Always show finish and official/net time
-    if (!columns.includes('timeFinish')) columns.push('timeFinish');
+        // Always show finish and official/net time
+        if (!columns.includes('timeFinish')) columns.push('timeFinish');
+    }
+} else if (viewMode === 'overall') {
+    displayData = rankData;
+    if (Array.isArray(rankData) && rankData.length > 0) {
+        columns = [
+            'rank1Tot', 'rank1Mix', 'rank1Cat', 'bib', 'name', 'cat', 'officialTime', 'netTime'
+        ];
+    }
+} else if (viewMode === 'gender') {
+    displayData = rankData;
+    if (Array.isArray(rankData) && rankData.length > 0) {
+        columns = [
+            'rank1Mix', 'rank1Cat', 'bib', 'name', 'cat', 'officialTime', 'netTime'
+        ];
+    }
 }
+
+// Get dynamic columns based on cplist (LEGACY - keeping for backwards compatibility)
+// let columns = [];
+// if (Array.isArray(catDetail) && catDetail.length > 0) {
+//     // Always show these columns first
+//     columns = [
+//         'rank1Cat', 'bib', 'name', 'officialTime', 'netTime', 'timeStart'
+//     ];
+
+//     // Parse cplist for CP columns
+//     const cplist = catDetail[0].cplist
+//         ? catDetail[0].cplist.split(',').map(cp => cp.trim().replace('Time', 'time')) // Convert "TimeCP1" to "timeCP1"
+//         : [];
+
+//     // console.log('Raw cplist:', catDetail[0].cplist); // Debugging
+//     // console.log('Processed cplist:', cplist); // Debugging
+
+//     // Dynamically rename timeCP columns
+//     const availableTimeCPs = cplist.filter(cp => /^timeCP\d+$/.test(cp)); // Ensure valid timeCP keys
+//     // console.log('Available TimeCPs:', availableTimeCPs); // Debugging
+
+//     availableTimeCPs.forEach((key, index) => {
+//         columnDisplayNames[key] = `Split_${index + 1}`;
+//         // console.log(`Renaming ${key} to Split_${index + 1}`); // Debugging output
+//         if (!columns.includes(key)) columns.push(key); // Add to columns if not already present
+//     });
+
+//     // Always show finish and official/net time
+//     if (!columns.includes('timeFinish')) columns.push('timeFinish');
+// }
 
 // console.log('Final Columns:', columns); // Debugging
 // console.log('Column Display Names:', columnDisplayNames); // Debugging
@@ -353,10 +455,57 @@ if (Array.isArray(catDetail) && catDetail.length > 0) {
                     >
                         🏆 Leaderboard
                     </button>
+                    <button
+                        onClick={() => {
+                            setViewMode('overall');
+                            const distances = [...new Set(categories.map(c => c.distance).filter(Boolean))];
+                            if (distances.length > 0 && !selectedDistance) {
+                                setSelectedDistance(distances[0]);
+                            }
+                        }}
+                        style={{
+                            background: viewMode === 'overall' ? '#ffc107' : '#fff',
+                            color: viewMode === 'overall' ? '#fff' : '#333',
+                            border: viewMode === 'overall' ? '2px solid #ffc107' : '1px solid #ccc',
+                            borderRadius: 6,
+                            padding: '8px 20px',
+                            fontWeight: viewMode === 'overall' ? 'bold' : 'normal',
+                            fontSize: 16,
+                            cursor: 'pointer',
+                            boxShadow: '0 2px 8px rgba(0,0,0,0.07)',
+                            height: 40
+                        }}
+                    >
+                        📊 Overall Rank
+                    </button>
+                    <button
+                        onClick={() => {
+                            setViewMode('gender');
+                            const distances = [...new Set(categories.map(c => c.distance).filter(Boolean))];
+                            if (distances.length > 0 && !selectedDistance) {
+                                setSelectedDistance(distances[0]);
+                            }
+                        }}
+                        style={{
+                            background: viewMode === 'gender' ? '#17a2b8' : '#fff',
+                            color: viewMode === 'gender' ? '#fff' : '#333',
+                            border: viewMode === 'gender' ? '2px solid #17a2b8' : '1px solid #ccc',
+                            borderRadius: 6,
+                            padding: '8px 20px',
+                            fontWeight: viewMode === 'gender' ? 'bold' : 'normal',
+                            fontSize: 16,
+                            cursor: 'pointer',
+                            boxShadow: '0 2px 8px rgba(0,0,0,0.07)',
+                            height: 40
+                        }}
+                    >
+                        👥 Gender Rank
+                    </button>
                     {categories.map(cat => (
                         <button
                             key={cat.catId}
                             onClick={() => {
+                                setViewMode('category');
                                 setSelectedCatId(cat.catId);
                                 setSelectedCat(cat);
                             }}
@@ -375,8 +524,165 @@ if (Array.isArray(catDetail) && catDetail.length > 0) {
                         </button>
                     ))}
                 </div>
+
+                {/* Distance selector for Overall and Gender Rank */}
+                {(viewMode === 'overall' || viewMode === 'gender') && (
+                    <div style={{ display: 'flex', gap: 16, marginBottom: 16, alignItems: 'center', justifyContent: 'center' }}>
+                        <label style={{ fontWeight: 'bold', fontSize: 16 }}>Distance:</label>
+                        <select
+                            value={selectedDistance}
+                            onChange={(e) => setSelectedDistance(e.target.value)}
+                            style={{
+                                padding: '8px 12px',
+                                borderRadius: 6,
+                                border: '1px solid #ccc',
+                                fontSize: 16,
+                                cursor: 'pointer'
+                            }}
+                        >
+                            {[...new Set(categories.map(c => c.distance).filter(Boolean))].map(dist => (
+                                <option key={dist} value={dist}>{dist}</option>
+                            ))}
+                        </select>
+                    </div>
+                )}
+
+                {/* Gender selector for Gender Rank */}
+                {viewMode === 'gender' && (
+                    <div style={{ display: 'flex', gap: 16, marginBottom: 16, alignItems: 'center', justifyContent: 'center' }}>
+                        <label style={{ fontWeight: 'bold', fontSize: 16 }}>Gender:</label>
+                        <div style={{ display: 'flex', gap: 8 }}>
+                            <button
+                                onClick={() => setSelectedGender('M')}
+                                style={{
+                                    padding: '8px 20px',
+                                    borderRadius: 6,
+                                    border: selectedGender === 'M' ? '2px solid #007bff' : '1px solid #ccc',
+                                    background: selectedGender === 'M' ? '#007bff' : '#f7f7f7',
+                                    color: selectedGender === 'M' ? '#fff' : '#333',
+                                    fontWeight: selectedGender === 'M' ? 'bold' : 'normal',
+                                    fontSize: 16,
+                                    cursor: 'pointer'
+                                }}
+                            >
+                                Male
+                            </button>
+                            <button
+                                onClick={() => setSelectedGender('F')}
+                                style={{
+                                    padding: '8px 20px',
+                                    borderRadius: 6,
+                                    border: selectedGender === 'F' ? '2px solid #007bff' : '1px solid #ccc',
+                                    background: selectedGender === 'F' ? '#007bff' : '#f7f7f7',
+                                    color: selectedGender === 'F' ? '#fff' : '#333',
+                                    fontWeight: selectedGender === 'F' ? 'bold' : 'normal',
+                                    fontSize: 16,
+                                    cursor: 'pointer'
+                                }}
+                            >
+                                Female
+                            </button>
+                        </div>
+                    </div>
+                )}
+
+                {/* Download button for Overall Rank */}
+                {viewMode === 'overall' && selectedDistance && (
+                    <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 16 }}>
+                        <button
+                            onClick={async () => {
+                                const orgId = sessionStorage.getItem('orgId');
+                                const res = await authFetch(`${apiBase}/report/event/overall-rank/xlsx`, {
+                                    method: 'POST',
+                                    headers: {
+                                        'Content-Type': 'application/json',
+                                        'OrgId': orgId
+                                    },
+                                    body: JSON.stringify({
+                                        eventId,
+                                        distance: selectedDistance
+                                    })
+                                });
+                                if (!res.ok) {
+                                    alert('Failed to download Excel file.');
+                                    return;
+                                }
+                                const blob = await res.blob();
+                                const url = window.URL.createObjectURL(blob);
+                                const a = document.createElement('a');
+                                a.href = url;
+                                a.download = `${eventName || 'event'}_overall_rank_${selectedDistance}.xlsx`;
+                                document.body.appendChild(a);
+                                a.click();
+                                a.remove();
+                                window.URL.revokeObjectURL(url);
+                            }}
+                            style={{
+                                background: '#007bff',
+                                color: '#fff',
+                                border: 'none',
+                                borderRadius: 6,
+                                padding: '10px 28px',
+                                fontWeight: 'bold',
+                                fontSize: 16,
+                                cursor: 'pointer'
+                            }}
+                        >
+                            Download Overall Rank
+                        </button>
+                    </div>
+                )}
+
+                {/* Download button for Gender Rank */}
+                {viewMode === 'gender' && selectedDistance && selectedGender && (
+                    <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 16 }}>
+                        <button
+                            onClick={async () => {
+                                const orgId = sessionStorage.getItem('orgId');
+                                const res = await authFetch(`${apiBase}/report/event/gender-rank/xlsx`, {
+                                    method: 'POST',
+                                    headers: {
+                                        'Content-Type': 'application/json',
+                                        'OrgId': orgId
+                                    },
+                                    body: JSON.stringify({
+                                        eventId,
+                                        distance: selectedDistance,
+                                        gender: selectedGender
+                                    })
+                                });
+                                if (!res.ok) {
+                                    alert('Failed to download Excel file.');
+                                    return;
+                                }
+                                const blob = await res.blob();
+                                const url = window.URL.createObjectURL(blob);
+                                const a = document.createElement('a');
+                                a.href = url;
+                                a.download = `${eventName || 'event'}_gender_rank_${selectedDistance}_${selectedGender}.xlsx`;
+                                document.body.appendChild(a);
+                                a.click();
+                                a.remove();
+                                window.URL.revokeObjectURL(url);
+                            }}
+                            style={{
+                                background: '#007bff',
+                                color: '#fff',
+                                border: 'none',
+                                borderRadius: 6,
+                                padding: '10px 28px',
+                                fontWeight: 'bold',
+                                fontSize: 16,
+                                cursor: 'pointer'
+                            }}
+                        >
+                            Download Gender Rank
+                        </button>
+                    </div>
+                )}
+
                 {/* Selected category name below buttons, above table */}
-                {selectedCat && (
+                {viewMode === 'category' && selectedCat && (
                     <div
                         style={{
                             width: '100%',
@@ -392,56 +698,92 @@ if (Array.isArray(catDetail) && catDetail.length > 0) {
                         <span>
                             {selectedCat.cat} - {selectedCat.name}
                         </span>
-                        <button
-                            onClick={async () => {
-                                if (!selectedCat) return;
-                                const orgId = sessionStorage.getItem('orgId');
-                                const res = await authFetch(`${apiBase}/report/event/category/xlsx`, {
-                                    method: 'POST',
-                                    headers: {
-                                        'Content-Type': 'application/json',
-                                        'OrgId': orgId
-                                    },
-                                    body: JSON.stringify({
-                                        eventId,
-                                        category: selectedCat.cat
-                                    })
-                                });
-                                if (!res.ok) {
-                                    alert('Failed to download Excel file.');
-                                    return;
-                                }
-                                const blob = await res.blob();
-                                const url = window.URL.createObjectURL(blob);
-                                const a = document.createElement('a');
-                                a.href = url;
-                                a.download = `${eventName || 'event'}_${selectedCat.cat}_category.xlsx`;
-                                document.body.appendChild(a);
-                                a.click();
-                                a.remove();
-                                window.URL.revokeObjectURL(url);
-                            }}
-                            style={{
-                                background: '#007bff',
-                                color: '#fff',
-                                border: 'none',
-                                borderRadius: 6,
-                                padding: '10px 28px',
-                                fontWeight: 'bold',
-                                fontSize: 16,
-                                cursor: selectedCat ? 'pointer' : 'not-allowed',
-                                opacity: selectedCat ? 1 : 0.5
-                            }}
-                            disabled={!selectedCat}
-                        >
-                            Download
-                        </button>
+                        <div style={{ display: 'flex', gap: '10px' }}>
+                            <button
+                                onClick={async () => {
+                                    if (!eventId) return;
+                                    if (!window.confirm('Calculate ranks for all categories in this event?')) return;
+                                    try {
+                                        const res = await authFetch(`${apiBase}/report/event/calculate-ranks`, {
+                                            method: 'POST',
+                                            headers: { 'Content-Type': 'application/json' },
+                                            body: JSON.stringify({ eventId })
+                                        });
+                                        if (res.ok) {
+                                            alert('Ranks calculated successfully!');
+                                            // Refresh the current category data
+                                            window.location.reload();
+                                        } else {
+                                            alert('Failed to calculate ranks.');
+                                        }
+                                    } catch (err) {
+                                        alert('Error calculating ranks.');
+                                    }
+                                }}
+                                style={{
+                                    background: '#28a745',
+                                    color: '#fff',
+                                    border: 'none',
+                                    borderRadius: 6,
+                                    padding: '10px 28px',
+                                    fontWeight: 'bold',
+                                    fontSize: 16,
+                                    cursor: 'pointer'
+                                }}
+                            >
+                                Calculate Rank
+                            </button>
+                            <button
+                                onClick={async () => {
+                                    if (!selectedCat) return;
+                                    const orgId = sessionStorage.getItem('orgId');
+                                    const res = await authFetch(`${apiBase}/report/event/category/xlsx`, {
+                                        method: 'POST',
+                                        headers: {
+                                            'Content-Type': 'application/json',
+                                            'OrgId': orgId
+                                        },
+                                        body: JSON.stringify({
+                                            eventId,
+                                            category: selectedCat.cat
+                                        })
+                                    });
+                                    if (!res.ok) {
+                                        alert('Failed to download Excel file.');
+                                        return;
+                                    }
+                                    const blob = await res.blob();
+                                    const url = window.URL.createObjectURL(blob);
+                                    const a = document.createElement('a');
+                                    a.href = url;
+                                    a.download = `${eventName || 'event'}_${selectedCat.cat}_category.xlsx`;
+                                    document.body.appendChild(a);
+                                    a.click();
+                                    a.remove();
+                                    window.URL.revokeObjectURL(url);
+                                }}
+                                style={{
+                                    background: '#007bff',
+                                    color: '#fff',
+                                    border: 'none',
+                                    borderRadius: 6,
+                                    padding: '10px 28px',
+                                    fontWeight: 'bold',
+                                    fontSize: 16,
+                                    cursor: selectedCat ? 'pointer' : 'not-allowed',
+                                    opacity: selectedCat ? 1 : 0.5
+                                }}
+                                disabled={!selectedCat}
+                            >
+                                Download
+                            </button>
+                        </div>
                     </div>
                 )}
                 {/* Category Detail Table */}
-                {catDetailLoading ? (
+                {(viewMode === 'category' && catDetailLoading) || ((viewMode === 'overall' || viewMode === 'gender') && rankDataLoading) ? (
                     <div>Loading details...</div>
-                ) : catDetail && columns.length > 0 ? (
+                ) : displayData && columns.length > 0 ? (
                     <div style={{ width: '100%' }}>
                         <div style={{
                             width: '100%',
@@ -462,9 +804,10 @@ if (Array.isArray(catDetail) && catDetail.length > 0) {
                                     <tr>
                                         {columns.map(key => {
                                             let width;
-                                            if (key === 'rank1Cat') width = '8%';
+                                            if (key === 'rank1Cat' || key === 'rank1Tot' || key === 'rank1Mix') width = '8%';
                                             else if (key === 'bib') width = '8%';
                                             else if (key === 'name') width = '20%';
+                                            else if (key === 'cat') width = '12%';
                                             else width = `${(100 - 8 - 8 - 32) / (columns.length - 3)}%`; // distribute remaining
                                             return (
                                                 <th
@@ -490,7 +833,7 @@ if (Array.isArray(catDetail) && catDetail.length > 0) {
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {catDetail.map((row, idx) => (
+                                    {displayData.map((row, idx) => (
                                         <tr
                                             key={idx}
                                             style={{
@@ -499,9 +842,10 @@ if (Array.isArray(catDetail) && catDetail.length > 0) {
                                         >
                                             {columns.map((key, i) => {
                                                 let width;
-                                                if (key === 'rank1Cat') width = '8%';
+                                                if (key === 'rank1Cat' || key === 'rank1Tot' || key === 'rank1Mix') width = '8%';
                                                 else if (key === 'bib') width = '8%';
                                                 else if (key === 'name') width = '20%';
+                                                else if (key === 'cat') width = '12%';
                                                 else width = `${(100 - 8 - 8 - 32) / (columns.length - 3)}%`;
                                                 return (
                                                     <td
