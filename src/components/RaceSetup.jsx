@@ -35,6 +35,7 @@ const RaceSetup = () => {
         gender: 'M',
         raceMode: 'OFFICIAL',
         toplist: 10,
+        topprize: 0,
         isresult: 1,
         islive: 0
     });
@@ -269,6 +270,20 @@ const RaceSetup = () => {
                                         </label>
                                         &nbsp;|&nbsp;
                                         <label>
+                                            Prize:&nbsp;
+                                            <input
+                                                type="number"
+                                                min={0}
+                                                max={100}
+                                                value={editingCp[cat.catId + '_topprize'] ?? cat.topprize}
+                                                onChange={e =>
+                                                    setEditingCp(prev => ({ ...prev, [cat.catId + '_topprize']: e.target.value }))
+                                                }
+                                                style={{ width: 60 }}
+                                            />
+                                        </label>
+                                        &nbsp;|&nbsp;
+                                        <label>
                                             <input
                                                 type="checkbox"
                                                 checked={(editingCp[cat.catId + '_isresult'] ?? cat.isresult) === 1}
@@ -295,6 +310,9 @@ const RaceSetup = () => {
                                         </span>
                                         <span style={{display: 'inline-block', minWidth: 80}}>
                                             Top: {cat.toplist}
+                                        </span>
+                                        <span style={{display: 'inline-block', minWidth: 90}}>
+                                            Prize: {cat.topprize}
                                         </span>
                                         <span style={{display: 'inline-block', minWidth: 70}}>
                                             Report: {cat.isresult === 1 ? 'Yes' : 'No'}
@@ -330,6 +348,7 @@ const RaceSetup = () => {
                                                 const gender = editingCp[cat.catId + '_gender'] ?? cat.gender;
                                                 const raceMode = editingCp[cat.catId + '_raceMode'] ?? cat.raceMode;
                                                 const toplist = editingCp[cat.catId + '_toplist'] ?? cat.toplist;
+                                                const topprize = editingCp[cat.catId + '_topprize'] ?? cat.topprize;
                                                 const isresult = editingCp[cat.catId + '_isresult'] ?? cat.isresult;
                                                 try {
                                                     await authFetch(`${apiBase}/race/category/update`, {
@@ -343,6 +362,7 @@ const RaceSetup = () => {
                                                             gender,
                                                             raceMode,
                                                             toplist,
+                                                            topprize,
                                                             isresult
                                                         })
                                                     });
@@ -593,6 +613,19 @@ const RaceSetup = () => {
                 </label>
                 &nbsp;|&nbsp;
                 <label>
+                    Prize:&nbsp;
+                    <input
+                        name="topprize"
+                        type="number"
+                        min={0}
+                        max={100}
+                        value={newCat.topprize}
+                        onChange={handleNewCatChange}
+                        style={{ width: 60 }}
+                    />
+                </label>
+                &nbsp;|&nbsp;
+                <label>
                     <input
                         name="isresult"
                         type="checkbox"
@@ -650,6 +683,7 @@ const RaceSetup = () => {
                                 gender: 'M',
                                 raceMode: 'OFFICIAL',
                                 toplist: 10,
+                                topprize: 0,
                                 isresult: 1,
                                 islive: 0
                             });

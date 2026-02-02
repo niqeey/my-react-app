@@ -126,6 +126,7 @@ const PublicLeaderboard = () => {
 
     // Get dynamic columns based on cplist
     let columns = [];
+    let topPrize = 0; // Number of positions to show medals for
     if (Array.isArray(catDetail) && catDetail.length > 0) {
         const cplist = catDetail[0].cplist || '';
         const baseCols = ['rankCat', 'bib', 'name'];
@@ -137,6 +138,20 @@ const PublicLeaderboard = () => {
         // Reordered: timeStart, then checkpoints, then timeFinish, officialTime, netTime
         columns = [...baseCols, 'timeStart', ...cpCols, 'timeFinish', 'officialTime', 'netTime'];
     }
+    
+    // Get topprize value from selected category
+    if (selectedCat && selectedCat.topprize !== undefined) {
+        topPrize = selectedCat.topprize;
+    }
+
+    // Medal emoji mapping
+    const getMedal = (rank) => {
+        if (topPrize === 0 || rank > topPrize) return '';
+        if (rank === 1) return '🥇';
+        if (rank === 2) return '🥈';
+        if (rank === 3) return '🥉';
+        return '🏅'; // Generic medal for ranks 4+
+    };
 
     return (
         <div style={{
@@ -262,7 +277,13 @@ const PublicLeaderboard = () => {
                                             fontWeight: col === 'rankCat' ? 600 : 400,
                                             color: '#333'
                                         }}>
-                                            {formatTimeNoMs(row[col]) || row[col] || '-'}
+                                            {col === 'rankCat' && row[col] && getMedal(row[col]) ? (
+                                                <span>
+                                                    {getMedal(row[col])} {row[col]}
+                                                </span>
+                                            ) : (
+                                                formatTimeNoMs(row[col]) || row[col] || '-'
+                                            )}
                                         </td>
                                     ))}
                                 </tr>
