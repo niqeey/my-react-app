@@ -163,7 +163,7 @@ const PublicLeaderboard = () => {
         }}>
             {/* Header */}
             <div style={{
-                background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                background: 'linear-gradient(135deg, #ff4500 0%, #e63946 100%)',
                 padding: isMobile ? '24px 16px' : '32px 24px',
                 borderRadius: '12px',
                 color: '#fff',
@@ -208,17 +208,17 @@ const PublicLeaderboard = () => {
                                 borderRadius: '8px',
                                 cursor: 'pointer',
                                 background: selectedCat?.catId === cat.catId 
-                                    ? 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'
+                                    ? 'linear-gradient(135deg, #ff4500 0%, #e63946 100%)'
                                     : '#f5f5f5',
                                 color: selectedCat?.catId === cat.catId ? '#fff' : '#333',
                                 boxShadow: selectedCat?.catId === cat.catId 
-                                    ? '0 2px 8px rgba(102, 126, 234, 0.4)'
+                                    ? '0 2px 8px rgba(255, 69, 0, 0.4)'
                                     : 'none',
                                 transition: 'all 0.2s',
                                 whiteSpace: 'nowrap'
                             }}
                         >
-                            {cat.category} ({cat.distance}KM)
+                            {cat.name}
                         </button>
                     ))}
                 </div>

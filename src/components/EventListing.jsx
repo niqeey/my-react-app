@@ -14,7 +14,7 @@ const formatDate = (dateString) => {
 };
 
 const EventListing = () => {
-    const { orgId } = useOrg();
+    const { orgId, setOrgId } = useOrg();
     const [events, setEvents] = useState(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
@@ -38,16 +38,23 @@ const EventListing = () => {
     const navigate = useNavigate();
 
     useEffect(() => {
-        fetchEvents();
+        // Check sessionStorage if context orgId is missing
+        const currentOrgId = orgId || sessionStorage.getItem('orgId');
+        if (currentOrgId && !orgId) {
+            setOrgId(currentOrgId);
+        }
+        if (currentOrgId) {
+            fetchEvents(currentOrgId);
+        }
         // eslint-disable-next-line
     }, [orgId]);
 
-    const fetchEvents = () => {
+    const fetchEvents = (currentOrgId = orgId) => {
         setLoading(true);
         authFetch(`${apiBase}/org/event/list`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ orgId })
+            body: JSON.stringify({ orgId: currentOrgId })
         })
         .then(res => {
             if (!res.ok) throw new Error('Network response was not ok');
