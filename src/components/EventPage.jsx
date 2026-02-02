@@ -336,6 +336,23 @@ if (Array.isArray(catDetail) && catDetail.length > 0) {
                     >
                         Statistic
                     </button>
+                    <button
+                        onClick={() => window.open(`/public/leaderboard/${eventId}`, '_blank')}
+                        style={{
+                            background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                            color: '#fff',
+                            border: 'none',
+                            borderRadius: 6,
+                            padding: '8px 20px',
+                            fontWeight: 'bold',
+                            fontSize: 16,
+                            cursor: 'pointer',
+                            boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+                            height: 40
+                        }}
+                    >
+                        🏆 Leaderboard
+                    </button>
                     {categories.map(cat => (
                         <button
                             key={cat.catId}

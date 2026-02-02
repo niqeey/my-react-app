@@ -40,24 +40,47 @@ const PublicLeaderboard = () => {
     // Fetch leaderboard data when category is selected
     useEffect(() => {
         if (!selectedCat) return;
-        setCatDetailLoading(true);
-        setCatDetail(null);
-        fetch(`${apiBase}/public/leaderboard/${eventId}`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                category: selectedCat.cat
+        
+        let isInitialLoad = true;
+        
+        const fetchData = () => {
+            // Only show loading indicator on initial load
+            if (isInitialLoad) {
+                setCatDetailLoading(true);
+                setCatDetail(null);
+            }
+            
+            fetch(`${apiBase}/public/leaderboard/${eventId}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    category: selectedCat.cat
+                })
             })
-        })
-        .then(res => res.json())
-        .then(data => {
-            setCatDetail(data);
-            setCatDetailLoading(false);
-        })
-        .catch(() => {
-            setCatDetail(null);
-            setCatDetailLoading(false);
-        });
+            .then(res => res.json())
+            .then(data => {
+                setCatDetail(data);
+                if (isInitialLoad) {
+                    setCatDetailLoading(false);
+                    isInitialLoad = false;
+                }
+            })
+            .catch(() => {
+                if (isInitialLoad) {
+                    setCatDetail(null);
+                    setCatDetailLoading(false);
+                }
+            });
+        };
+        
+        // Initial fetch
+        fetchData();
+        
+        // Set up auto-refresh every 3 seconds (silent updates)
+        const interval = setInterval(fetchData, 3000);
+        
+        // Cleanup interval on unmount or when selectedCat changes
+        return () => clearInterval(interval);
     }, [selectedCat, eventId]);
 
     useEffect(() => {
@@ -237,13 +260,8 @@ const PublicLeaderboard = () => {
                                             left: col === 'rankCat' ? 0 : 'auto',
                                             background: col === 'rankCat' ? (index % 2 === 0 ? '#fff' : '#fafafa') : 'transparent',
                                             fontWeight: col === 'rankCat' ? 600 : 400,
-                                            color: col === 'rankCat' && index < 3 ? '#d4af37' : '#333'
+                                            color: '#333'
                                         }}>
-                                            {col === 'rankCat' && index < 3 && (
-                                                <span style={{ marginRight: '4px' }}>
-                                                    {index === 0 ? '🥇' : index === 1 ? '🥈' : '🥉'}
-                                                </span>
-                                            )}
                                             {formatTimeNoMs(row[col]) || row[col] || '-'}
                                         </td>
                                     ))}
