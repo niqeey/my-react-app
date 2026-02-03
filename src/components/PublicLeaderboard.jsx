@@ -8,9 +8,8 @@ const PublicLeaderboard = () => {
     const [eventName, setEventName] = useState('');
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
-    const [selectedCat, setSelectedCat] = useState(null);
-    const [catDetail, setCatDetail] = useState(null);
-    const [catDetailLoading, setCatDetailLoading] = useState(false);
+    const [catDetails, setCatDetails] = useState({});
+    const [catDetailsLoading, setCatDetailsLoading] = useState(false);
     const [isMobile, setIsMobile] = useState(window.innerWidth <= 600);
 
     // Load categories (no auth required)
@@ -26,7 +25,6 @@ const PublicLeaderboard = () => {
             setCategories(cats);
             if (cats.length > 0) {
                 setEventName(cats[0].eventName || 'Event Leaderboard');
-                setSelectedCat(cats[0]);
             }
             setLoading(false);
         })
@@ -37,56 +35,70 @@ const PublicLeaderboard = () => {
         });
     }, [eventId]);
 
-    // Fetch leaderboard data when category is selected
+    // Fetch leaderboard data for all categories
     useEffect(() => {
-        if (!selectedCat) return;
-        
+        if (!categories || categories.length === 0) return;
+
         let isInitialLoad = true;
-        
-        const fetchData = () => {
-            // Only show loading indicator on initial load
+
+        const fetchAllCategories = () => {
             if (isInitialLoad) {
-                setCatDetailLoading(true);
-                setCatDetail(null);
+                setCatDetailsLoading(true);
             }
-            
-            fetch(`${apiBase}/public/leaderboard/${eventId}`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    category: selectedCat.cat
-                })
-            })
-            .then(res => res.json())
-            .then(data => {
-                setCatDetail(data);
+
+            Promise.all(
+                categories.map(cat =>
+                    fetch(`${apiBase}/public/leaderboard/${eventId}`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ category: cat.cat })
+                    })
+                    .then(res => res.json())
+                    .then(data => ({ catId: cat.catId, data }))
+                    .catch(() => ({ catId: cat.catId, data: [] }))
+                )
+            )
+            .then(results => {
+                const next = {};
+                results.forEach(r => { next[r.catId] = r.data; });
+                setCatDetails(next);
                 if (isInitialLoad) {
-                    setCatDetailLoading(false);
+                    setCatDetailsLoading(false);
                     isInitialLoad = false;
                 }
             })
             .catch(() => {
                 if (isInitialLoad) {
-                    setCatDetail(null);
-                    setCatDetailLoading(false);
+                    setCatDetailsLoading(false);
                 }
             });
         };
-        
+
         // Initial fetch
-        fetchData();
-        
-        // Set up auto-refresh every 3 seconds (silent updates)
-        const interval = setInterval(fetchData, 3000);
-        
-        // Cleanup interval on unmount or when selectedCat changes
+        fetchAllCategories();
+
+        // Set up auto-refresh every 2 seconds (silent updates)
+        const interval = setInterval(fetchAllCategories, 2000);
+
         return () => clearInterval(interval);
-    }, [selectedCat, eventId]);
+    }, [categories, eventId]);
 
     useEffect(() => {
         const handleResize = () => setIsMobile(window.innerWidth <= 600);
         window.addEventListener('resize', handleResize);
         return () => window.removeEventListener('resize', handleResize);
+    }, []);
+
+    useEffect(() => {
+        const prevBody = document.body.style.overflowX;
+        const prevHtml = document.documentElement.style.overflowX;
+        document.body.style.overflowX = 'hidden';
+        document.documentElement.style.overflowX = 'hidden';
+
+        return () => {
+            document.body.style.overflowX = prevBody;
+            document.documentElement.style.overflowX = prevHtml;
+        };
     }, []);
 
     // Format time values by removing milliseconds
@@ -118,35 +130,15 @@ const PublicLeaderboard = () => {
         rankCat: 'Rank',
         bib: 'Bib',
         name: 'Name',
-        timeStart: 'Time Start',
         timeFinish: 'Time Finish',
-        officialTime: 'Official Time',
         netTime: 'Net Time',
     };
 
-    // Get dynamic columns based on cplist
-    let columns = [];
-    let topPrize = 0; // Number of positions to show medals for
-    if (Array.isArray(catDetail) && catDetail.length > 0) {
-        const cplist = catDetail[0].cplist || '';
-        const baseCols = ['rankCat', 'bib', 'name'];
-        // Convert TimeCP1 -> timeCP1 to match API response keys
-        const cpCols = cplist ? cplist.split(',').map(cp => {
-            const trimmed = cp.trim();
-            return trimmed.charAt(0).toLowerCase() + trimmed.slice(1);
-        }) : [];
-        // Reordered: timeStart, then checkpoints, then timeFinish, officialTime, netTime
-        columns = [...baseCols, 'timeStart', ...cpCols, 'timeFinish', 'officialTime', 'netTime'];
-    }
-    
-    // Get topprize value from selected category
-    if (selectedCat && selectedCat.topprize !== undefined) {
-        topPrize = selectedCat.topprize;
-    }
+    const columns = ['rankCat', 'bib', 'name', 'timeFinish', 'netTime'];
 
     // Medal emoji mapping
-    const getMedal = (rank) => {
-        if (topPrize === 0 || rank > topPrize) return '';
+    const getMedal = (rank, topPrize) => {
+        if (!topPrize || rank > topPrize) return '';
         if (rank === 1) return '🥇';
         if (rank === 2) return '🥈';
         if (rank === 3) return '🥉';
@@ -157,9 +149,11 @@ const PublicLeaderboard = () => {
         <div style={{
             minHeight: 'calc(100vh - 80px)',
             paddingBottom: 100,
-            maxWidth: isMobile ? '100%' : 1400,
-            margin: '0 auto',
-            padding: isMobile ? '16px' : '24px'
+            width: '99%',
+            maxWidth: '100%',
+            margin: 0,
+            padding: isMobile ? '16px' : '24px',
+            overflowX: 'hidden'
         }}>
             {/* Header */}
             <div style={{
@@ -167,13 +161,16 @@ const PublicLeaderboard = () => {
                 padding: isMobile ? '24px 16px' : '32px 24px',
                 borderRadius: '12px',
                 color: '#fff',
-                marginBottom: '24px',
+                margin: '0 16px 24px 16px',
+                width: 'calc(100% - 32px)',
+                boxSizing: 'border-box',
                 boxShadow: '0 4px 12px rgba(0,0,0,0.15)'
             }}>
                 <h1 style={{ 
                     margin: 0, 
                     fontSize: isMobile ? '24px' : '32px',
-                    fontWeight: 700 
+                    fontWeight: 700, 
+                    width: '90%'
                 }}>
                     🏆 Leaderboard
                 </h1>
@@ -186,110 +183,117 @@ const PublicLeaderboard = () => {
                 </p>
             </div>
 
-            {/* Category Tabs */}
-            {categories.length > 0 && (
-                <div style={{
-                    display: 'flex',
-                    gap: '8px',
-                    marginBottom: '24px',
-                    flexWrap: 'wrap',
-                    overflowX: 'auto',
-                    padding: '4px'
-                }}>
-                    {categories.map(cat => (
-                        <button
-                            key={cat.catId}
-                            onClick={() => setSelectedCat(cat)}
-                            style={{
-                                padding: isMobile ? '10px 16px' : '12px 24px',
-                                fontSize: isMobile ? '14px' : '16px',
-                                fontWeight: selectedCat?.catId === cat.catId ? 600 : 400,
-                                border: 'none',
-                                borderRadius: '8px',
-                                cursor: 'pointer',
-                                background: selectedCat?.catId === cat.catId 
-                                    ? 'linear-gradient(135deg, #ff4500 0%, #e63946 100%)'
-                                    : '#f5f5f5',
-                                color: selectedCat?.catId === cat.catId ? '#fff' : '#333',
-                                boxShadow: selectedCat?.catId === cat.catId 
-                                    ? '0 2px 8px rgba(255, 69, 0, 0.4)'
-                                    : 'none',
-                                transition: 'all 0.2s',
-                                whiteSpace: 'nowrap'
-                            }}
-                        >
-                            {cat.name}
-                        </button>
-                    ))}
-                </div>
-            )}
-
-            {/* Results Table */}
-            {catDetailLoading ? (
+            {/* Results Tables */}
+            {catDetailsLoading ? (
                 <div style={{ textAlign: 'center', padding: '40px', fontSize: '16px', color: '#666' }}>
                     Loading results...
                 </div>
-            ) : catDetail && catDetail.length > 0 ? (
+            ) : categories.length > 0 ? (
                 <div style={{
+                    display: 'flex',
+                    flexDirection: 'row',
+                    gap: '20px',
                     overflowX: 'auto',
-                    background: '#fff',
-                    borderRadius: '12px',
-                    boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
-                    padding: isMobile ? '12px' : '16px'
+                    padding: '0 16px 8px 16px',
+                    scrollPadding: '0 16px 0 16px',
+                    justifyContent: 'flex-start',
+                    alignItems: 'flex-start',
+                    width: '100%',
+                    boxSizing: 'border-box'
                 }}>
-                    <table style={{
-                        width: '100%',
-                        borderCollapse: 'collapse',
-                        minWidth: isMobile ? '600px' : 'auto',
-                        fontSize: isMobile ? '13px' : '15px'
-                    }}>
-                        <thead>
-                            <tr>
-                                {columns.map(col => (
-                                    <th key={col} style={{
-                                        background: '#f5f5f5',
-                                        padding: '12px 8px',
-                                        border: '1px solid #ddd',
-                                        fontWeight: 600,
-                                        textAlign: 'left',
-                                        position: col === 'rankCat' ? 'sticky' : 'static',
-                                        left: col === 'rankCat' ? 0 : 'auto',
-                                        zIndex: col === 'rankCat' ? 2 : 1
-                                    }}>
-                                        {columnDisplayNames[col] || col}
-                                    </th>
-                                ))}
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {catDetail.map((row, index) => (
-                                <tr key={index} style={{ 
-                                    background: index % 2 === 0 ? '#fff' : '#fafafa',
-                                    borderBottom: '1px solid #e0e0e0'
+                    {categories.map(cat => {
+                        const data = catDetails[cat.catId] || [];
+                        const topPrize = cat.topprize;
+
+                        return (
+                            <div key={cat.catId} style={{
+                                background: '#fff',
+                                borderRadius: '12px',
+                                boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+                                padding: isMobile ? '12px' : '16px',
+                                minWidth: isMobile ? '90vw' : '700px',
+                                flex: isMobile ? '0 0 90vw' : '1 0 700px'
+                            }}>
+                                <div style={{
+                                    fontSize: isMobile ? '16px' : '18px',
+                                    fontWeight: 700,
+                                    marginBottom: '12px',
+                                    color: '#333',
+                                    textAlign: 'center'
                                 }}>
-                                    {columns.map(col => (
-                                        <td key={col} style={{
-                                            padding: '10px 8px',
-                                            border: '1px solid #ddd',
-                                            position: col === 'rankCat' ? 'sticky' : 'static',
-                                            left: col === 'rankCat' ? 0 : 'auto',
-                                            background: col === 'rankCat' ? (index % 2 === 0 ? '#fff' : '#fafafa') : 'transparent',
-                                            fontWeight: col === 'rankCat' ? 600 : 400,
-                                            color: '#333'
-                                        }}>
-                                            {col === 'rankCat' && row[col] && getMedal(row[col]) ? (
-                                                <span>
-                                                    {getMedal(row[col])} {row[col]}
-                                                </span>
+                                    {cat.name}
+                                </div>
+
+                                <div style={{ overflowX: 'auto' }}>
+                                    <table style={{
+                                        width: '100%',
+                                        borderCollapse: 'collapse',
+                                        minWidth: '600px',
+                                        fontSize: isMobile ? '13px' : '15px'
+                                    }}>
+                                        <thead>
+                                            <tr>
+                                                {columns.map(col => (
+                                                    <th key={col} style={{
+                                                        background: '#f5f5f5',
+                                                        padding: '12px 8px',
+                                                        border: '1px solid #ddd',
+                                                        fontWeight: 600,
+                                                        textAlign: 'left',
+                                                        position: col === 'rankCat' ? 'sticky' : 'static',
+                                                        left: col === 'rankCat' ? 0 : 'auto',
+                                                        zIndex: col === 'rankCat' ? 2 : 1
+                                                    }}>
+                                                        {columnDisplayNames[col] || col}
+                                                    </th>
+                                                ))}
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {data && data.length > 0 ? (
+                                                data.map((row, index) => (
+                                                    <tr key={index} style={{
+                                                        background: index % 2 === 0 ? '#fff' : '#fafafa',
+                                                        borderBottom: '1px solid #e0e0e0'
+                                                    }}>
+                                                        {columns.map(col => (
+                                                            <td key={col} style={{
+                                                                padding: '10px 8px',
+                                                                border: '1px solid #ddd',
+                                                                position: col === 'rankCat' ? 'sticky' : 'static',
+                                                                left: col === 'rankCat' ? 0 : 'auto',
+                                                                background: col === 'rankCat' ? (index % 2 === 0 ? '#fff' : '#fafafa') : 'transparent',
+                                                                fontWeight: col === 'rankCat' ? 600 : 400,
+                                                                color: '#333'
+                                                            }}>
+                                                                {col === 'rankCat' && row[col] && getMedal(row[col], topPrize) ? (
+                                                                    <span>
+                                                                        {getMedal(row[col], topPrize)} {row[col]}
+                                                                    </span>
+                                                                ) : (
+                                                                    formatTimeNoMs(row[col]) || row[col] || '-'
+                                                                )}
+                                                            </td>
+                                                        ))}
+                                                    </tr>
+                                                ))
                                             ) : (
-                                                formatTimeNoMs(row[col]) || row[col] || '-'
+                                                <tr>
+                                                    <td colSpan={columns.length} style={{
+                                                        textAlign: 'center',
+                                                        padding: '24px',
+                                                        color: '#666'
+                                                    }}>
+                                                        No results available for this category yet.
+                                                    </td>
+                                                </tr>
                                             )}
-                                        </td>
-                                    ))}
-                                </tr>
-                            ))}
-                        </tbody>
-                    </table>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        );
+                    })}
                 </div>
             ) : (
                 <div style={{
@@ -299,7 +303,7 @@ const PublicLeaderboard = () => {
                     borderRadius: '12px',
                     color: '#666'
                 }}>
-                    <p style={{ fontSize: '18px', margin: 0 }}>No results available for this category yet.</p>
+                    <p style={{ fontSize: '18px', margin: 0 }}>No results available yet.</p>
                 </div>
             )}
 

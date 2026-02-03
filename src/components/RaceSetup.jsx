@@ -28,6 +28,7 @@ const RaceSetup = () => {
     const [loading, setLoading] = useState(true);
     const [showModal, setShowModal] = useState(false);
     const [uploadStatus, setUploadStatus] = useState(null); // For upload feedback
+    const [uploadProgress, setUploadProgress] = useState(null); // Track progress percentage
     const [newCat, setNewCat] = useState({
         category: '',
         cat: '',
@@ -122,10 +123,46 @@ const RaceSetup = () => {
             return next;
         });
     };
+
+    const handleTimegunUpdate = async (catId, cat) => {
+        const input = window.prompt('Enter Timegun value (number):');
+        if (input === null) return; // user cancelled
+        const timegun = Number(input);
+        if (!Number.isFinite(timegun) || timegun < 0) {
+            alert('Please enter a valid non-negative number.');
+            return;
+        }
+
+        try {
+            const res = await authFetch(`${apiBase}/race/category/timegun`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ eventId, cat, timegun })
+            });
+
+            if (!res.ok) {
+                const msg = await res.text();
+                throw new Error(msg || 'Failed to update Timegun');
+            }
+
+            alert('Timegun updated successfully.');
+        } catch (err) {
+            alert(`Failed to update Timegun: ${err.message}`);
+        }
+    };
     
     const handleCsvUpload = async (catId, cat, file) => {
         // Show processing status immediately
-        setUploadStatus({ type: 'processing', message: 'Processing CSV file...', catId });
+        setUploadStatus({ type: 'processing', message: 'Uploading CSV file...', catId });
+        setUploadProgress({ catId, progress: 0 });
+        
+        // Calculate estimated processing time based on file size
+        // Assumption: 35KB takes ~1 minute (60000ms)
+        const fileSizeKB = file.size / 1024;
+        const estimatedProcessingTimeMs = (fileSizeKB / 35) * 60000;
+        const updateIntervalMs = 500; // Update progress every 500ms
+        const estimatedUpdates = estimatedProcessingTimeMs / updateIntervalMs;
+        const progressPerUpdate = 90 / estimatedUpdates; // Cap at 90%
         
         const formData = new FormData();
         formData.append('file', file);
@@ -133,16 +170,45 @@ const RaceSetup = () => {
         formData.append('cat', cat);
         
         try {
+            // Create an AbortController for timeout (15 minutes)
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 900000);
+            
+            // Simulate realistic progress updates based on file size
+            const startTime = Date.now();
+            const progressInterval = setInterval(() => {
+                setUploadProgress(prev => {
+                    if (!prev || prev.catId !== catId) return prev;
+                    const elapsedMs = Date.now() - startTime;
+                    const estimatedProgress = Math.min((elapsedMs / estimatedProcessingTimeMs) * 90, 90);
+                    return { catId, progress: Math.round(estimatedProgress) };
+                });
+            }, updateIntervalMs);
+            
             const res = await authFetch(`${apiBase}/race/category/upload-csv`, {
                 method: 'POST',
-                body: formData
+                body: formData,
+                signal: controller.signal
             });
+            
+            clearTimeout(timeoutId);
+            clearInterval(progressInterval);
+            setUploadProgress({ catId, progress: 100 });
+            
             const data = await res.json();
             setUploadStatus({ type: 'success', message: data.message, catId });
-            setTimeout(() => setUploadStatus(null), 5000);
+            setTimeout(() => {
+                setUploadStatus(null);
+                setUploadProgress(null);
+            }, 5000);
         } catch (err) {
-            setUploadStatus({ type: 'error', message: err.message || 'Upload failed', catId });
-            setTimeout(() => setUploadStatus(null), 5000);
+            setUploadProgress(null);
+            if (err.name === 'AbortError') {
+                setUploadStatus({ type: 'error', message: 'Upload timed out after 15 minutes. Please try again.', catId });
+            } else {
+                setUploadStatus({ type: 'error', message: err.message || 'Upload failed', catId });
+            }
+            setTimeout(() => setUploadStatus(null), 8000);
         }
     };
 
@@ -437,6 +503,18 @@ const RaceSetup = () => {
                                                 }}
                                             >Edit</button>
                                             <button
+                                                onClick={() => handleTimegunUpdate(cat.catId, cat.cat)}
+                                                style={{
+                                                    background: '#fff',
+                                                    color: '#6a1b9a',
+                                                    border: '1px solid #6a1b9a',
+                                                    padding: '6px 16px',
+                                                    borderRadius: 5,
+                                                    cursor: 'pointer',
+                                                    minWidth: 80
+                                                }}
+                                            >Timegun</button>
+                                            <button
                                                 onClick={async () => {
                                                     if (window.confirm(`Are you sure you want to delete category "${cat.cat}"? This action cannot be undone.`)) {
                                                         try {
@@ -508,20 +586,55 @@ const RaceSetup = () => {
                                         />
                                     </label>
                                     {uploadStatus && uploadStatus.catId === cat.catId && (
-                                        <span style={{
-                                            padding: '6px 12px',
-                                            borderRadius: '4px',
-                                            fontSize: '0.9rem',
-                                            background: uploadStatus.type === 'success' ? '#d4edda' : 
-                                                       uploadStatus.type === 'error' ? '#f8d7da' : '#fff3cd',
-                                            color: uploadStatus.type === 'success' ? '#155724' : 
-                                                   uploadStatus.type === 'error' ? '#721c24' : '#856404',
-                                            border: uploadStatus.type === 'success' ? '1px solid #c3e6cb' : 
-                                                    uploadStatus.type === 'error' ? '1px solid #f5c6cb' : '1px solid #ffeaa7'
-                                        }}>
-                                            {uploadStatus.type === 'processing' && '⏳ '}
-                                            {uploadStatus.message}
-                                        </span>
+                                        <div style={{ flex: 1, maxWidth: 400 }}>
+                                            {uploadProgress && uploadProgress.catId === cat.catId && uploadStatus.type === 'processing' ? (
+                                                <div>
+                                                    <div style={{
+                                                        fontSize: '0.85rem',
+                                                        color: '#856404',
+                                                        marginBottom: 4
+                                                    }}>
+                                                        {uploadStatus.message} {uploadProgress.progress}%
+                                                    </div>
+                                                    <div style={{
+                                                        width: '100%',
+                                                        height: 20,
+                                                        background: '#f0f0f0',
+                                                        borderRadius: 10,
+                                                        overflow: 'hidden',
+                                                        border: '1px solid #ddd'
+                                                    }}>
+                                                        <div style={{
+                                                            width: `${uploadProgress.progress}%`,
+                                                            height: '100%',
+                                                            background: 'linear-gradient(90deg, #4caf50, #81c784)',
+                                                            transition: 'width 0.3s ease',
+                                                            display: 'flex',
+                                                            alignItems: 'center',
+                                                            justifyContent: 'center',
+                                                            color: '#fff',
+                                                            fontSize: '0.75rem',
+                                                            fontWeight: 'bold'
+                                                        }}>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            ) : (
+                                                <span style={{
+                                                    padding: '6px 12px',
+                                                    borderRadius: '4px',
+                                                    fontSize: '0.9rem',
+                                                    display: 'inline-block',
+                                                    background: uploadStatus.type === 'success' ? '#d4edda' : '#f8d7da',
+                                                    color: uploadStatus.type === 'success' ? '#155724' : '#721c24',
+                                                    border: uploadStatus.type === 'success' ? '1px solid #c3e6cb' : '1px solid #f5c6cb'
+                                                }}>
+                                                    {uploadStatus.type === 'success' && '✓ '}
+                                                    {uploadStatus.type === 'error' && '✗ '}
+                                                    {uploadStatus.message}
+                                                </span>
+                                            )}
+                                        </div>
                                     )}
                                 </div>
                             </div>
