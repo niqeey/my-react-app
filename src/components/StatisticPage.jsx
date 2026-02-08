@@ -26,7 +26,7 @@ const StatisticPage = () => {
     const [data, setData] = useState([]);
     const [loading, setLoading] = useState(true);
     const [eventName, setEventName] = useState('');
-    const [countdown, setCountdown] = useState(10000); // 10 seconds
+    const [countdown, setCountdown] = useState(60000); // 60 seconds
     const intervalRef = useRef();
     const [collapsedDistances, setCollapsedDistances] = useState({});
     const [popupData, setPopupData] = useState(null);
@@ -228,34 +228,6 @@ const StatisticPage = () => {
                 >
                     Refresh
                 </button>
-            </div>
-
-            {/* Countdown bar below the title, same width as title+button */}
-            <div
-                style={{
-                    width: '100%',
-                    maxWidth: 480,
-                    margin: '8px auto 16px auto',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center'
-                }}
-            >
-                <div style={{
-                    width: '100%',
-                    height: 8,
-                    background: '#e3f0ff',
-                    borderRadius: 4,
-                    overflow: 'hidden',
-                    position: 'relative'
-                }}>
-                    <div style={{
-                        width: `${(countdown / 10000) * 100}%`,
-                        height: '100%',
-                        background: '#4fc3f7',
-                        transition: 'width 1s linear'
-                    }} />
-                </div>
             </div>
 
             <p style={{

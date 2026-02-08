@@ -130,19 +130,20 @@ const PublicLeaderboard = () => {
         rankCat: 'Rank',
         bib: 'Bib',
         name: 'Name',
+        sex: 'Gender',
         timeFinish: 'Time Finish',
         netTime: 'Net Time',
     };
 
-    const columns = ['rankCat', 'bib', 'name', 'timeFinish', 'netTime'];
+    const columns = ['rankCat', 'bib', 'name', 'sex', 'timeFinish', 'netTime'];
 
-    // Medal emoji mapping
-    const getMedal = (rank, topPrize) => {
-        if (!topPrize || rank > topPrize) return '';
-        if (rank === 1) return '🥇';
-        if (rank === 2) return '🥈';
-        if (rank === 3) return '🥉';
-        return '🏅'; // Generic medal for ranks 4+
+    // Medal emoji mapping - based on rankMix (gender-based rank) and topPrize limit
+    const getMedal = (rankMix, topPrize) => {
+        if (!rankMix || !topPrize || rankMix > topPrize) return '';
+        if (rankMix === 1) return '🥇';
+        if (rankMix === 2) return '🥈';
+        if (rankMix === 3) return '🥉';
+        return ''; // No medal for ranks 4+
     };
 
     return (
@@ -266,9 +267,9 @@ const PublicLeaderboard = () => {
                                                                 fontWeight: col === 'rankCat' ? 600 : 400,
                                                                 color: '#333'
                                                             }}>
-                                                                {col === 'rankCat' && row[col] && getMedal(row[col], topPrize) ? (
+                                                                {col === 'rankCat' && row[col] && getMedal(row.rankMix, topPrize) ? (
                                                                     <span>
-                                                                        {getMedal(row[col], topPrize)} {row[col]}
+                                                                        {getMedal(row.rankMix, topPrize)} {row[col]}
                                                                     </span>
                                                                 ) : (
                                                                     formatTimeNoMs(row[col]) || row[col] || '-'
