@@ -278,15 +278,45 @@ if (viewMode === 'category') {
     displayData = rankData;
     if (Array.isArray(rankData) && rankData.length > 0) {
         columns = [
-            'rank1Tot', 'rank1Mix', 'rank1Cat', 'bib', 'name', 'cat', 'officialTime', 'netTime'
+            'rank1Tot', 'rank1Mix', 'rank1Cat', 'bib', 'name', 'cat', 'officialTime', 'netTime', 'timeStart'
         ];
+        
+        // Parse cplist for CP columns
+        const cplist = rankData[0].cplist
+            ? rankData[0].cplist.split(',').map(cp => cp.trim().replace('Time', 'time')) // Convert "TimeCP1" to "timeCP1"
+            : [];
+
+        // Dynamically add timeCP columns from cplist
+        const availableTimeCPs = cplist.filter(cp => /^timeCP\d+$/.test(cp));
+        availableTimeCPs.forEach((key, index) => {
+            columnDisplayNames[key] = `Split_${index + 1}`;
+            if (!columns.includes(key)) columns.push(key);
+        });
+
+        // Add timeFinish at the end
+        if (!columns.includes('timeFinish')) columns.push('timeFinish');
     }
 } else if (viewMode === 'gender') {
     displayData = rankData;
     if (Array.isArray(rankData) && rankData.length > 0) {
         columns = [
-            'rank1Mix', 'rank1Cat', 'bib', 'name', 'cat', 'officialTime', 'netTime'
+            'rank1Mix', 'rank1Cat', 'bib', 'name', 'cat', 'officialTime', 'netTime', 'timeStart'
         ];
+        
+        // Parse cplist for CP columns
+        const cplist = rankData[0].cplist
+            ? rankData[0].cplist.split(',').map(cp => cp.trim().replace('Time', 'time')) // Convert "TimeCP1" to "timeCP1"
+            : [];
+
+        // Dynamically add timeCP columns from cplist
+        const availableTimeCPs = cplist.filter(cp => /^timeCP\d+$/.test(cp));
+        availableTimeCPs.forEach((key, index) => {
+            columnDisplayNames[key] = `Split_${index + 1}`;
+            if (!columns.includes(key)) columns.push(key);
+        });
+
+        // Add timeFinish at the end
+        if (!columns.includes('timeFinish')) columns.push('timeFinish');
     }
 }
 
@@ -794,7 +824,7 @@ if (viewMode === 'category') {
                                     width: '100%',
                                     minWidth: 600, // ensures table doesn't shrink too much
                                     maxWidth: '100%',
-                                    tableLayout: 'fixed',
+                                    tableLayout: 'auto',
                                     borderCollapse: 'collapse',
                                     marginTop: 0,
                                     fontSize: '1rem'
@@ -803,12 +833,12 @@ if (viewMode === 'category') {
                                 <thead>
                                     <tr>
                                         {columns.map(key => {
-                                            let width;
-                                            if (key === 'rank1Cat' || key === 'rank1Tot' || key === 'rank1Mix') width = '8%';
-                                            else if (key === 'bib') width = '8%';
-                                            else if (key === 'name') width = '20%';
-                                            else if (key === 'cat') width = '12%';
-                                            else width = `${(100 - 8 - 8 - 32) / (columns.length - 3)}%`; // distribute remaining
+                                            let minWidth;
+                                            if (key === 'rank1Cat' || key === 'rank1Tot' || key === 'rank1Mix') minWidth = 70;
+                                            else if (key === 'bib') minWidth = 70;
+                                            else if (key === 'name') minWidth = 200;
+                                            else if (key === 'cat') minWidth = 100;
+                                            else minWidth = 90;
                                             return (
                                                 <th
                                                     key={key}
@@ -821,9 +851,7 @@ if (viewMode === 'category') {
                                                         wordBreak: 'break-word',
                                                         overflow: 'hidden',
                                                         textOverflow: 'ellipsis',
-                                                        width,
-                                                        minWidth: width,
-                                                        maxWidth: width,
+                                                        minWidth,
                                                     }}
                                                 >
                                                     {columnDisplayNames[key] || key}
@@ -841,12 +869,12 @@ if (viewMode === 'category') {
                                             }}
                                         >
                                             {columns.map((key, i) => {
-                                                let width;
-                                                if (key === 'rank1Cat' || key === 'rank1Tot' || key === 'rank1Mix') width = '8%';
-                                                else if (key === 'bib') width = '8%';
-                                                else if (key === 'name') width = '20%';
-                                                else if (key === 'cat') width = '12%';
-                                                else width = `${(100 - 8 - 8 - 32) / (columns.length - 3)}%`;
+                                                let minWidth;
+                                                if (key === 'rank1Cat' || key === 'rank1Tot' || key === 'rank1Mix') minWidth = 70;
+                                                else if (key === 'bib') minWidth = 70;
+                                                else if (key === 'name') minWidth = 200;
+                                                else if (key === 'cat') minWidth = 100;
+                                                else minWidth = 90;
                                                 return (
                                                     <td
                                                         key={i}
@@ -856,9 +884,7 @@ if (viewMode === 'category') {
                                                             wordBreak: 'break-word',
                                                             overflow: 'hidden',
                                                             textOverflow: 'ellipsis',
-                                                            width,
-                                                            minWidth: width,
-                                                            maxWidth: width,
+                                                            minWidth,
                                                         }}
                                                     >
                                                         {row[key] !== undefined
