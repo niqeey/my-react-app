@@ -127,7 +127,7 @@ const RaceSetup = () => {
             const parts = (checkpointlist || '0,0,1,0').split(',');
             setEditingCp(prev => ({
                 ...prev,
-                [catId]: null, // Not using CP array for lap mode
+                [catId]: [], // Mark editing state even in lap mode
                 [catId + '_isLapMode']: true,
                 [catId + '_halflapDistance']: parts[0] || '0',
                 [catId + '_fulllapDistance']: parts[1] || '0',
@@ -206,6 +206,38 @@ const RaceSetup = () => {
             alert('Timegun updated successfully.');
         } catch (err) {
             alert(`Failed to update Timegun: ${err.message}`);
+        }
+    };
+
+    const handleStartRace = async (cat, checkpointlist) => {
+        if (!window.confirm(`Start the race for category "${cat.cat}"? This will set timestart for all participants.`)) {
+            return;
+        }
+
+        try {
+            // Parse cplist to get halflap value: "halflap,fulllap,numberOfLaps,totalDistance"
+            const parts = (checkpointlist || '0,0,1,0').split(',');
+            const halflap = parseInt(parts[0]) || 0;
+
+            const res = await authFetch(`${apiBase}/race/category/start-race`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    eventId,
+                    cat: cat.cat,
+                    halflap
+                })
+            });
+
+            if (!res.ok) {
+                const msg = await res.text();
+                throw new Error(msg || 'Failed to start race');
+            }
+
+            const result = await res.text();
+            alert(result);
+        } catch (err) {
+            alert(`Failed to start race: ${err.message}`);
         }
     };
     
@@ -307,7 +339,7 @@ const RaceSetup = () => {
                         fontFamily: 'monospace',
                         fontSize: '0.9rem'
                     }}>
-                        pid, chipcode, bib, name, sex
+                        pid, chipcode, bib, name, sex, country , nric
                     </p>
                     <ul style={{ margin: '0', paddingLeft: '24px' }}>
                         <li><strong>pid:</strong> Participant ID (set to <code style={{background: '#ffebee', padding: '2px 6px', borderRadius: '3px', color: '#c62828'}}>0</code> to delete an existing participant)</li>
@@ -315,6 +347,8 @@ const RaceSetup = () => {
                         <li><strong>bib:</strong> Bib number (used to match existing participants)</li>
                         <li><strong>name:</strong> Participant name</li>
                         <li><strong>sex:</strong> M or F (optional, for mixed categories)</li>
+                        <li><strong>country:</strong> Participant country</li>
+                        <li><strong>nric:</strong> Participant NRIC/ID number</li>
                     </ul>
                     <p style={{ margin: '12px 0 0 0', color: '#666', fontSize: '0.9rem' }}>
                         ℹ️ <em>
@@ -728,6 +762,21 @@ const RaceSetup = () => {
                                                     minWidth: 70
                                                 }}
                                             >Delete</button>
+                                            {cat.raceMode === 'LAP' && (
+                                                <button
+                                                    onClick={() => handleStartRace(cat, cat.checkpointlist)}
+                                                    style={{
+                                                        background: '#fff',
+                                                        color: '#ff6f00',
+                                                        border: '1px solid #ff6f00',
+                                                        padding: '6px 16px',
+                                                        borderRadius: 5,
+                                                        cursor: 'pointer',
+                                                        minWidth: 90,
+                                                        fontWeight: 600
+                                                    }}
+                                                >🏁 Start Race</button>
+                                            )}
                                         </div>
                                     </div>
                                 )}

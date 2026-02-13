@@ -137,13 +137,14 @@ const LapLeaderboard = () => {
     );
 
     // Helper function to get maximum lap count from lap times
+    // Only consider time1 onwards (time0 is half lap or ignored)
     const getMaxLaps = (participants) => {
         let max = 0;
         participants.forEach(p => {
             if (p.lapTimes) {
                 const lapNumbers = Object.keys(p.lapTimes)
                     .map(key => parseInt(key.replace('time', '')))
-                    .filter(num => !isNaN(num));
+                    .filter(num => !isNaN(num) && num > 0);
                 if (lapNumbers.length > 0) {
                     max = Math.max(max, Math.max(...lapNumbers));
                 }
@@ -195,11 +196,12 @@ const LapLeaderboard = () => {
     };
 
     // Helper function to calculate lap count (count non-null lap times)
+    // Only count time1 onwards (time0 is either half lap or ignored)
     const calculateLapCount = (participant) => {
         if (!participant.lapTimes) return 0;
         const lapNumbers = Object.keys(participant.lapTimes)
             .map(key => parseInt(key.replace('time', '')))
-            .filter(num => !isNaN(num) && participant.lapTimes[`time${num}`]);
+            .filter(num => !isNaN(num) && num > 0 && participant.lapTimes[`time${num}`]);
         return lapNumbers.length;
     };
 
@@ -351,6 +353,26 @@ const LapLeaderboard = () => {
                     const participants = catDetails[selectedCat.catId] || [];
                     const sortedParticipants = getSortedParticipants(participants);
                     const checkpointCount = getCheckpointCount(selectedCat.checkpointlist);
+                    
+                    // Parse cplist to determine if we should show half-lap column
+                    // cplist format: "halflap,fulllap,numberOfLaps,totalDistance"
+                    const getCplist = (cplist) => {
+                        if (!cplist) return { halflap: 0, fulflap: 0, numberOfLaps: 0, totalDistance: 0 };
+                        const parts = cplist.split(',');
+                        return {
+                            halflap: parseInt(parts[0]?.trim() || 0),
+                            fulllap: parseInt(parts[1]?.trim() || 0),
+                            numberOfLaps: parseInt(parts[2]?.trim() || 0),
+                            totalDistance: parseInt(parts[3]?.trim() || 0)
+                        };
+                    };
+                    const cplistData = getCplist(selectedCat.checkpointlist);
+                    const showHalfLap = cplistData.halflap > 0;
+                    
+                    // Lap mapping:
+                    // When halflap > 0: time0 = Half Lap, time1 = Lap 1, time2 = Lap 2, etc.
+                    // When halflap = 0: ignore time0, time1 = Lap 1, time2 = Lap 2, etc.
+                    // So lap columns always use: time1, time2, time3, etc.
 
                     return (
                         <div style={{
@@ -395,6 +417,7 @@ const LapLeaderboard = () => {
                                                     <th style={{...thStyle}}>Pos</th>
                                                     <th style={{...thStyle}}>Bib</th>
                                                     <th style={{...thStyle}}>Name</th>
+                                                    <th style={{...thStyle}}>Time Start</th>
                                                     <th style={{...thStyle}}>Laps</th>
                                                     <th style={{...thStyle}}>Total Time</th>
                                                 </tr>
@@ -418,6 +441,7 @@ const LapLeaderboard = () => {
                                                         </td>
                                                         <td style={tdStyle}>{p.bib || '-'}</td>
                                                         <td style={{...tdStyle, fontWeight: 500}}>{p.name || '-'}</td>
+                                                        <td style={tdStyle}>{p.timeStart || '-'}</td>
                                                         <td style={tdStyle}>{calculateLapCount(p)}</td>
                                                         <td style={{...tdStyle, fontWeight: 600, color: '#667eea'}}>{calculateTotalTime(p)}</td>
                                                     </tr>
@@ -442,6 +466,7 @@ const LapLeaderboard = () => {
                                         }}>
                                             <thead>
                                                 <tr style={{ background: '#667eea', borderBottom: '3px solid #667eea', height: '52px' }}>
+                                                    {showHalfLap && <th style={thStyle}>1/2 Lap</th>}
                                                     {[...Array(checkpointCount)].map((_, i) => (
                                                         <th key={i} style={thStyle}>Lap {i + 1}</th>
                                                     ))}
@@ -454,7 +479,13 @@ const LapLeaderboard = () => {
                                                         background: pIdx % 2 === 0 ? 'white' : '#f8f9fa',
                                                         height: '48px'
                                                     }}>
+                                                        {showHalfLap && (
+                                                            <td style={tdStyle}>
+                                                                {p.lapTimes?.time0 || '-'}
+                                                            </td>
+                                                        )}
                                                         {[...Array(checkpointCount)].map((_, i) => {
+                                                            // Lap columns always map to: time1 = Lap 1, time2 = Lap 2, etc.
                                                             const lapTimeKey = `time${i + 1}`;
                                                             const lapTime = p.lapTimes ? p.lapTimes[lapTimeKey] : null;
                                                             return (

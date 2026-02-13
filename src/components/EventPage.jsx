@@ -299,29 +299,43 @@ if (viewMode === 'category') {
             if (selectedCat.checkpointlist) {
                 const parts = selectedCat.checkpointlist.split(',');
                 const lapCount = parseInt(parts[2]) || 0;
+                // Check if halflap > 0 from cplist first field
+                const halflap = parseInt(parts[0]) || 0;
+                const includeTimeZero = halflap > 0;
                 
-                // Add time columns for each lap
-                for (let i = 1; i <= lapCount; i++) {
-                    const timeKey = `time${i}`;
+                // Add "1/2 Lap" column if halflap > 0
+                if (includeTimeZero) {
+                    columns.push('time0');
+                    columnDisplayNames['time0'] = '1/2 Lap';
+                }
+                
+                // Add time columns for each lap (always time1, time2, etc.)
+                for (let i = 0; i < lapCount; i++) {
+                    const timeKey = `time${i + 1}`;
                     columns.push(timeKey);
-                    columnDisplayNames[timeKey] = `Lap ${i}`;
+                    columnDisplayNames[timeKey] = `Lap ${i + 1}`;
                 }
             }
             
             // Process display data to calculate lap numbers dynamically
             displayData = catDetail
                 .map(row => {
-                    // Calculate lap = highest lap number with data
+                    // Calculate lap = highest lap number with data (exclude time0)
                     let maxLap = null;
+                    let lastLapTime = null;
                     const lapTimes = row.lapTimes || {};
+                    // Always start from time1 for lap counting (time0 is half-lap, not a full lap)
                     for (let i = 1; i <= 99; i++) {
                         if (lapTimes[`time${i}`] !== null && lapTimes[`time${i}`] !== undefined) {
                             maxLap = i;
+                            lastLapTime = lapTimes[`time${i}`];
                         }
                     }
                     return {
                         ...row,
-                        lap: maxLap // Override lap with calculated value
+                        ...lapTimes, // Flatten lapTimes to row level (time0, time1, time2, etc.)
+                        lap: maxLap, // lap count = highest timeN index (time1=Lap 1, time2=Lap 2, etc.)
+                        timeFinish: lastLapTime || row.timeFinish // Map timeFinish to last lap time
                     };
                 })
                 // Filter out participants without valid rank1Cat (null or 0)

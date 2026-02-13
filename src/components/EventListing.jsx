@@ -424,7 +424,7 @@ const EventListing = () => {
                                 </button>
                                 <button
                                     className="btn-results"
-                                    onClick={() => navigate(`/result/${event.id}`)}
+                                    onClick={() => navigate(`/event/${event.id}`)}
                                 >
                                     View Results
                                 </button>
