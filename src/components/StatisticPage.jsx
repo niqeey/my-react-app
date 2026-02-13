@@ -58,20 +58,20 @@ const StatisticPage = () => {
         const storedName = sessionStorage.getItem('eventName');
         if (storedName) setEventName(storedName);
 
-        // Countdown and polling logic
-        intervalRef.current = setInterval(() => {
-            setCountdown(prev => {
-                if (prev <= 1000) {
-                    fetchData();
-                    return 10000;
-                }
-                return prev - 1000;
-            });
-        }, 1000);
+        // Auto-refresh polling disabled
+        // intervalRef.current = setInterval(() => {
+        //     setCountdown(prev => {
+        //         if (prev <= 1000) {
+        //             fetchData();
+        //             return 10000;
+        //         }
+        //         return prev - 1000;
+        //     });
+        // }, 1000);
 
         return () => {
             isMounted = false;
-            clearInterval(intervalRef.current);
+            // clearInterval(intervalRef.current);
         };
     }, [eventId]);
 

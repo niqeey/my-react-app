@@ -1,5 +1,11 @@
 **/node_modules/
 
+# Certificates and private keys
+certs/
+*.key
+*.pem
+*.p12
+*.pfx
 
 ### VS Code ###
 .vscode/

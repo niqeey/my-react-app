@@ -38,9 +38,16 @@ const RaceSetup = () => {
         toplist: 10,
         topprize: 0,
         isresult: 1,
-        islive: 0
+        islive: 0,
+        isLap: false
     });
     const [cpList, setCpList] = useState(Array(10).fill(''));
+    const [lapParams, setLapParams] = useState({
+        halflapDistance: 0,
+        fulllapDistance: '',
+        numberOfLaps: 1,
+        totalDistance: 0
+    });
     const [editingCp, setEditingCp] = useState({}); // { [catId]: [cp1, cp2, ...] }
 
     useEffect(() => {
@@ -61,11 +68,47 @@ const RaceSetup = () => {
 
     const handleNewCatChange = e => {
         const { name, value, type, checked } = e.target;
-        setNewCat(prev => ({
+        if (name === 'isLap') {
+            const isLapMode = checked;
+            setNewCat(prev => ({
+                ...prev,
+                isLap: isLapMode,
+                raceMode: isLapMode ? 'LAP' : 'OFFICIAL'
+            }));
+        } else {
+            setNewCat(prev => ({
+                ...prev,
+                [name]: type === 'checkbox' ? (checked ? 1 : 0) : value
+            }));
+        }
+    };
+
+    const handleLapParamsChange = e => {
+        const { name, value } = e.target;
+        setLapParams(prev => ({
             ...prev,
-            [name]: type === 'checkbox' ? (checked ? 1 : 0) : value
+            [name]: value
         }));
     };
+
+    // Auto-calculate total distance when lap parameters change
+    useEffect(() => {
+        if (newCat.isLap) {
+            const halfLap = Number(lapParams.halflapDistance) || 0;
+            const fullLap = Number(lapParams.fulllapDistance) || 0;
+            const laps = Number(lapParams.numberOfLaps) || 0;
+            const total = halfLap + (fullLap * laps);
+            setLapParams(prev => ({
+                ...prev,
+                totalDistance: total
+            }));
+            // Also update the distance field to match
+            setNewCat(prev => ({
+                ...prev,
+                distance: total
+            }));
+        }
+    }, [lapParams.halflapDistance, lapParams.fulllapDistance, lapParams.numberOfLaps, newCat.isLap]);
 
     // For editing CP List inline
     const handleEditCpChange = (catId, idx, value) => {
@@ -78,11 +121,26 @@ const RaceSetup = () => {
         });
     };
 
-    const startEditCp = (catId, checkpointlist) => {
-        setEditingCp(prev => ({
-            ...prev,
-            [catId]: (checkpointlist || '').split(',').concat(Array(10).fill('')).slice(0, 10)
-        }));
+    const startEditCp = (catId, checkpointlist, raceMode) => {
+        if (raceMode === 'LAP') {
+            // Parse lap parameters: halflap,fulllap,laps,total
+            const parts = (checkpointlist || '0,0,1,0').split(',');
+            setEditingCp(prev => ({
+                ...prev,
+                [catId]: null, // Not using CP array for lap mode
+                [catId + '_isLapMode']: true,
+                [catId + '_halflapDistance']: parts[0] || '0',
+                [catId + '_fulllapDistance']: parts[1] || '0',
+                [catId + '_numberOfLaps']: parts[2] || '1',
+                [catId + '_totalDistance']: parts[3] || '0'
+            }));
+        } else {
+            setEditingCp(prev => ({
+                ...prev,
+                [catId]: (checkpointlist || '').split(',').concat(Array(10).fill('')).slice(0, 10),
+                [catId + '_isLapMode']: false
+            }));
+        }
     };
 
     const cancelEditCp = (catId) => {
@@ -366,7 +424,7 @@ const RaceSetup = () => {
                                 ) : (
                                     <>
                                         <span style={{display: 'inline-block', minWidth: 150}}>
-                                            Distance: {cat.distance}KM
+                                            Distance: {cat.raceMode === 'LAP' ? `${cat.distance}m` : `${cat.distance}KM`}
                                         </span>
                                         <span style={{display: 'inline-block', minWidth: 150}}>
                                             Gender: {cat.gender === 'M' ? "Men" : cat.gender === 'F' ? "Women" : "Mixed"}
@@ -387,30 +445,130 @@ const RaceSetup = () => {
                                 )}
                             </div>
                             <div style={{marginBottom: 8}}>
-                                <div style={{fontWeight: 600, marginBottom: 4}}>CP List:</div>
+                                <div style={{fontWeight: 600, marginBottom: 4}}>{cat.raceMode === 'LAP' || (isEditing && editingCp[cat.catId + '_isLapMode']) ? 'Lap Parameters:' : 'CP List:'}</div>
                                 {isEditing ? (
                                     <div>
-                                        <div style={{display:'flex', flexWrap:'wrap', gap:8, marginBottom:8}}>
-                                            {editingCp[cat.catId].map((cp, idx) => (
-                                                <select
-                                                    key={idx}
-                                                    value={cp}
-                                                    onChange={e => handleEditCpChange(cat.catId, idx, e.target.value)}
-                                                    style={{marginBottom:4}}
-                                                >
-                                                    <option value="">-</option>
-                                                    {cpOptions.map(opt => (
-                                                        <option key={opt} value={opt}>{opt}</option>
-                                                    ))}
-                                                </select>
-                                            ))}
-                                        </div>
+                                        {editingCp[cat.catId + '_isLapMode'] ? (
+                                            <div style={{marginBottom:8}}>
+                                                <div style={{marginBottom:8}}>
+                                                    <label style={{display:'block', marginBottom:4}}>
+                                                        <span style={{display:'inline-block', width:150}}>Half lap distance</span> :&nbsp;
+                                                        <input
+                                                            type="number"
+                                                            min={0}
+                                                            value={editingCp[cat.catId + '_halflapDistance'] || '0'}
+                                                            onChange={e => {
+                                                                const halfLap = Number(e.target.value) || 0;
+                                                                const fullLap = Number(editingCp[cat.catId + '_fulllapDistance']) || 0;
+                                                                const laps = Number(editingCp[cat.catId + '_numberOfLaps']) || 0;
+                                                                const total = halfLap + (fullLap * laps);
+                                                                setEditingCp(prev => ({
+                                                                    ...prev,
+                                                                    [cat.catId + '_halflapDistance']: e.target.value,
+                                                                    [cat.catId + '_totalDistance']: total.toString()
+                                                                }));
+                                                            }}
+                                                            style={{ width: 80, padding: '4px 6px', textAlign: 'right' }}
+                                                        />
+                                                        &nbsp;m
+                                                    </label>
+                                                </div>
+                                                <div style={{marginBottom:8}}>
+                                                    <label style={{display:'block', marginBottom:4}}>
+                                                        <span style={{display:'inline-block', width:150}}>Full lap distance</span> :&nbsp;
+                                                        <input
+                                                            type="number"
+                                                            min={0}
+                                                            value={editingCp[cat.catId + '_fulllapDistance'] || '0'}
+                                                            onChange={e => {
+                                                                const halfLap = Number(editingCp[cat.catId + '_halflapDistance']) || 0;
+                                                                const fullLap = Number(e.target.value) || 0;
+                                                                const laps = Number(editingCp[cat.catId + '_numberOfLaps']) || 0;
+                                                                const total = halfLap + (fullLap * laps);
+                                                                setEditingCp(prev => ({
+                                                                    ...prev,
+                                                                    [cat.catId + '_fulllapDistance']: e.target.value,
+                                                                    [cat.catId + '_totalDistance']: total.toString()
+                                                                }));
+                                                            }}
+                                                            style={{ width: 80, padding: '4px 6px', textAlign: 'right' }}
+                                                        />
+                                                        &nbsp;m
+                                                    </label>
+                                                </div>
+                                                <div style={{marginBottom:8}}>
+                                                    <label style={{display:'block', marginBottom:4}}>
+                                                        <span style={{display:'inline-block', width:150}}>Total distance</span> :&nbsp;
+                                                        <input
+                                                            type="number"
+                                                            value={editingCp[cat.catId + '_totalDistance'] || '0'}
+                                                            disabled
+                                                            style={{ width: 80, padding: '4px 6px', background: '#f5f5f5', color: '#666', textAlign: 'right' }}
+                                                        />
+                                                        &nbsp;m
+                                                    </label>
+                                                </div>
+                                                <div style={{marginBottom:8}}>
+                                                    <label style={{display:'block', marginBottom:4}}>
+                                                        <span style={{display:'inline-block', width:150}}>Number of laps</span> :&nbsp;
+                                                        <input
+                                                            type="number"
+                                                            min={1}
+                                                            max={99}
+                                                            value={editingCp[cat.catId + '_numberOfLaps'] || '1'}
+                                                            onChange={e => {
+                                                                const halfLap = Number(editingCp[cat.catId + '_halflapDistance']) || 0;
+                                                                const fullLap = Number(editingCp[cat.catId + '_fulllapDistance']) || 0;
+                                                                const laps = Number(e.target.value) || 0;
+                                                                const total = halfLap + (fullLap * laps);
+                                                                setEditingCp(prev => ({
+                                                                    ...prev,
+                                                                    [cat.catId + '_numberOfLaps']: e.target.value,
+                                                                    [cat.catId + '_totalDistance']: total.toString()
+                                                                }));
+                                                            }}
+                                                            style={{ width: 80, padding: '4px 6px', textAlign: 'right' }}
+                                                        />
+                                                    </label>
+                                                </div>
+                                            </div>
+                                        ) : (
+                                            <div style={{display:'flex', flexWrap:'wrap', gap:8, marginBottom:8}}>
+                                                {editingCp[cat.catId] && editingCp[cat.catId].map((cp, idx) => (
+                                                    <select
+                                                        key={idx}
+                                                        value={cp}
+                                                        onChange={e => handleEditCpChange(cat.catId, idx, e.target.value)}
+                                                        style={{marginBottom:4}}
+                                                    >
+                                                        <option value="">-</option>
+                                                        {cpOptions.map(opt => (
+                                                            <option key={opt} value={opt}>{opt}</option>
+                                                        ))}
+                                                    </select>
+                                                ))}
+                                            </div>
+                                        )}
                                         <button
                                             onClick={async () => {
                                                 // Save all fields
-                                                const cpArr = editingCp[cat.catId] || [];
-                                                const checkpointlist = cpArr.filter(Boolean).join(',');
-                                                const distance = editingCp[cat.catId + '_distance'] ?? cat.distance;
+                                                let checkpointlist;
+                                                let distance;
+                                                
+                                                if (editingCp[cat.catId + '_isLapMode']) {
+                                                    // For lap mode: halflap,fulllap,laps,total
+                                                    const halfLap = editingCp[cat.catId + '_halflapDistance'] || '0';
+                                                    const fullLap = editingCp[cat.catId + '_fulllapDistance'] || '0';
+                                                    const laps = editingCp[cat.catId + '_numberOfLaps'] || '1';
+                                                    const total = editingCp[cat.catId + '_totalDistance'] || '0';
+                                                    checkpointlist = `${halfLap},${fullLap},${laps},${total}`;
+                                                    distance = total; // Total distance in meters
+                                                } else {
+                                                    const cpArr = editingCp[cat.catId] || [];
+                                                    checkpointlist = cpArr.filter(Boolean).join(',');
+                                                    distance = editingCp[cat.catId + '_distance'] ?? cat.distance;
+                                                }
+                                                
                                                 const gender = editingCp[cat.catId + '_gender'] ?? cat.gender;
                                                 const raceMode = editingCp[cat.catId + '_raceMode'] ?? cat.raceMode;
                                                 const toplist = editingCp[cat.catId + '_toplist'] ?? cat.toplist;
@@ -470,28 +628,44 @@ const RaceSetup = () => {
                                 ) : (
                                     <div style={{display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'flex-end', minHeight: 40}}>
                                         <div style={{display: 'flex', flexWrap: 'wrap', gap: 8, flex: 1}}>
-                                            {(cat.checkpointlist || '').split(',').filter(Boolean).map(cp => (
-                                                <span
-                                                    key={cp}
-                                                    style={{
-                                                        background: '#e3f2fd',
-                                                        color: '#1976d2',
-                                                        borderRadius: 4,
-                                                        padding: '2px 10px',
-                                                        fontSize: '0.97em',
-                                                        marginBottom: 4
-                                                    }}
-                                                >
-                                                    {cp}
-                                                </span>
-                                            ))}
-                                            {(!cat.checkpointlist || cat.checkpointlist === '') && (
-                                                <span style={{color:'#aaa'}}>No CP</span>
+                                            {cat.raceMode === 'LAP' ? (
+                                                // Display lap parameters
+                                                (() => {
+                                                    const parts = (cat.checkpointlist || '0,0,1,0').split(',');
+                                                    return (
+                                                        <div>
+                                                            <div>Half lap: {parts[0]}m | Full lap: {parts[1]}m</div>
+                                                            <div>Laps: {parts[2]} | Total: {parts[3]}m</div>
+                                                        </div>
+                                                    );
+                                                })()
+                                            ) : (
+                                                // Display CP list
+                                                <>
+                                                    {(cat.checkpointlist || '').split(',').filter(Boolean).map(cp => (
+                                                        <span
+                                                            key={cp}
+                                                            style={{
+                                                                background: '#e3f2fd',
+                                                                color: '#1976d2',
+                                                                borderRadius: 4,
+                                                                padding: '2px 10px',
+                                                                fontSize: '0.97em',
+                                                                marginBottom: 4
+                                                            }}
+                                                        >
+                                                            {cp}
+                                                        </span>
+                                                    ))}
+                                                    {(!cat.checkpointlist || cat.checkpointlist === '') && (
+                                                        <span style={{color:'#aaa'}}>No CP</span>
+                                                    )}
+                                                </>
                                             )}
                                         </div>
                                         <div style={{marginLeft: 'auto', display: 'flex', gap: 8}}>
                                             <button
-                                                onClick={() => startEditCp(cat.catId, cat.checkpointlist)}
+                                                onClick={() => startEditCp(cat.catId, cat.checkpointlist, cat.raceMode)}
                                                 style={{
                                                     background: '#fff',
                                                     color: '#1976d2',
@@ -686,12 +860,36 @@ const RaceSetup = () => {
             </div>
             <div style={{marginBottom:12}}>
                 <label>
+                    <input
+                        name="isLap"
+                        type="checkbox"
+                        checked={newCat.isLap}
+                        onChange={handleNewCatChange}
+                    />
+                    &nbsp;Lap Mode
+                </label>
+            </div>
+            <div style={{marginBottom:12}}>
+                <label>
                     Distance:&nbsp;
-                    <select name="distance" value={newCat.distance} onChange={handleNewCatChange}>
-                        {[3,5,10,15,21,42].map(d => (
-                            <option key={d} value={d}>{d}KM</option>
-                        ))}
-                    </select>
+                    {newCat.isLap ? (
+                        <>
+                            <input
+                                name="distance"
+                                type="number"
+                                value={newCat.distance}
+                                disabled
+                                style={{ width: 80, background: '#f5f5f5', color: '#666', textAlign: 'right' }}
+                            />
+                            &nbsp;m
+                        </>
+                    ) : (
+                        <select name="distance" value={newCat.distance} onChange={handleNewCatChange}>
+                            {[3,5,10,15,21,42].map(d => (
+                                <option key={d} value={d}>{d}KM</option>
+                            ))}
+                        </select>
+                    )}
                 </label>
                 &nbsp;|&nbsp;
                 <label>
@@ -706,9 +904,10 @@ const RaceSetup = () => {
             <div style={{marginBottom:12}}>
                 <label>
                     Mode:&nbsp;
-                    <select name="raceMode" value={newCat.raceMode} onChange={handleNewCatChange}>
+                    <select name="raceMode" value={newCat.raceMode} onChange={handleNewCatChange} disabled={newCat.isLap}>
                         <option value="NET">NET</option>
                         <option value="OFFICIAL">OFFICIAL</option>
+                        <option value="LAP">LAP</option>
                     </select>
                 </label>
                 &nbsp;|&nbsp;
@@ -748,32 +947,122 @@ const RaceSetup = () => {
                     &nbsp;Report
                 </label>
             </div>
-            <div style={{marginBottom:12}}>
-                <div style={{marginBottom:4, fontWeight:600}}>CP List:</div>
-                <div style={{display:'flex', flexWrap:'wrap', gap:8}}>
-                    {cpList.map((cp, idx) => (
-                        <select
-                            key={idx}
-                            value={cp}
-                            onChange={e => handleCpChange(idx, e.target.value)}
-                            style={{marginBottom:4}}
-                        >
-                            <option value="">-</option>
-                            {cpOptions.map(opt => (
-                                <option key={opt} value={opt}>{opt}</option>
-                            ))}
-                        </select>
-                    ))}
+            {!newCat.isLap ? (
+                <div style={{marginBottom:12}}>
+                    <div style={{marginBottom:4, fontWeight:600}}>CP List:</div>
+                    <div style={{display:'flex', flexWrap:'wrap', gap:8}}>
+                        {cpList.map((cp, idx) => (
+                            <select
+                                key={idx}
+                                value={cp}
+                                onChange={e => handleCpChange(idx, e.target.value)}
+                                style={{marginBottom:4}}
+                            >
+                                <option value="">-</option>
+                                {cpOptions.map(opt => (
+                                    <option key={opt} value={opt}>{opt}</option>
+                                ))}
+                            </select>
+                        ))}
+                    </div>
                 </div>
-            </div>
+            ) : (
+                <div style={{marginBottom:12}}>
+                    <div style={{marginBottom:8, fontWeight:600}}>Lap Parameters:</div>
+                    <div style={{marginBottom:8}}>
+                        <label style={{display:'block', marginBottom:4}}>
+                            <span style={{display:'inline-block', width:150}}>Half lap distance</span> :&nbsp;
+                            <input
+                                name="halflapDistance"
+                                type="number"
+                                min={0}
+                                value={lapParams.halflapDistance}
+                                onChange={handleLapParamsChange}
+                                style={{ width: 80, padding: '4px 6px', textAlign: 'right' }}
+                            />
+                            &nbsp;m
+                        </label>
+                        <div style={{fontSize:'0.85rem', color:'#666', fontStyle:'italic', marginTop:4, marginLeft:168}}>
+                            Note: If event does not have half-lap, enter 0.
+                        </div>
+                    </div>
+                    <div style={{marginBottom:8}}>
+                        <label style={{display:'block', marginBottom:4}}>
+                            <span style={{display:'inline-block', width:150}}>Full lap distance</span> :&nbsp;
+                            <input
+                                name="fulllapDistance"
+                                type="number"
+                                min={0}
+                                value={lapParams.fulllapDistance}
+                                onChange={handleLapParamsChange}
+                                style={{ width: 80, padding: '4px 6px', textAlign: 'right' }}
+                            />
+                            &nbsp;m
+                        </label>
+                    </div>
+                    <div style={{marginBottom:8}}>
+                        <label style={{display:'block', marginBottom:4}}>
+                            <span style={{display:'inline-block', width:150}}>Total distance</span> :&nbsp;
+                            <input
+                                name="totalDistance"
+                                type="number"
+                                value={lapParams.totalDistance}
+                                disabled
+                                style={{ width: 80, padding: '4px 6px', background: '#f5f5f5', color: '#666', textAlign: 'right' }}
+                            />
+                            &nbsp;m
+                        </label>
+                    </div>
+                    <div style={{marginBottom:8}}>
+                        <label style={{display:'block', marginBottom:4}}>
+                            <span style={{display:'inline-block', width:150}}>Number of laps</span> :&nbsp;
+                            <input
+                                name="numberOfLaps"
+                                type="number"
+                                min={1}
+                                max={99}
+                                value={lapParams.numberOfLaps}
+                                onChange={handleLapParamsChange}
+                                style={{ width: 80, padding: '4px 6px', textAlign: 'right' }}
+                            />
+                        </label>
+                    </div>
+                </div>
+            )}
             <div style={{textAlign:'right'}}>
                 <button onClick={() => setShowModal(false)} style={{marginRight:12}}>Cancel</button>
                 <button
                     style={{background:'#1976d2',color:'#fff',border:'none',padding:'8px 18px',borderRadius:5,cursor:'pointer'}}
                     onClick={async () => {
                         try {
+                            // Validate lap mode parameters
+                            if (newCat.isLap) {
+                                const fullLap = Number(lapParams.fulllapDistance);
+                                const laps = Number(lapParams.numberOfLaps);
+                                const total = Number(lapParams.totalDistance);
+                                
+                                if (!fullLap || fullLap <= 0) {
+                                    alert('Please enter a valid full lap distance');
+                                    return;
+                                }
+                                if (!laps || laps < 1 || laps > 99) {
+                                    alert('Please enter a valid number of laps (1-99)');
+                                    return;
+                                }
+                                if (total <= 0) {
+                                    alert('Total distance must be greater than 0');
+                                    return;
+                                }
+                            }
+                            
                             // Combine selected CPs in order, skip blanks
-                            const checkpointlist = cpList.filter(Boolean).join(',');
+                            let checkpointlist;
+                            if (newCat.isLap) {
+                                // For lap mode: halflap,fulllap,laps,total
+                                checkpointlist = `${lapParams.halflapDistance},${lapParams.fulllapDistance},${lapParams.numberOfLaps},${lapParams.totalDistance}`;
+                            } else {
+                                checkpointlist = cpList.filter(Boolean).join(',');
+                            }
                             await authFetch(`${apiBase}/race/category/create`, {
                                 method: 'POST',
                                 headers: { 'Content-Type': 'application/json' },
@@ -798,9 +1087,16 @@ const RaceSetup = () => {
                                 toplist: 10,
                                 topprize: 0,
                                 isresult: 1,
-                                islive: 0
+                                islive: 0,
+                                isLap: false
                             });
                             setCpList(Array(10).fill(''));
+                            setLapParams({
+                                halflapDistance: 0,
+                                fulllapDistance: '',
+                                numberOfLaps: 1,
+                                totalDistance: 0
+                            });
                         } catch (err) {
                             alert('Failed to create category');
                         }

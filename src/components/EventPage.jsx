@@ -59,10 +59,12 @@ const EventPage = () => {
     }, [eventId]);
 
     // Fetch report on tab click
-    useEffect(() => {
+    const fetchCategoryData = (silent = false) => {
         if (!selectedCat) return;
-        setCatDetailLoading(true);
-        setCatDetail(null);
+        if (!silent) {
+            setCatDetailLoading(true);
+            setCatDetail(null);
+        }
         authFetch(`${apiBase}/report/event/category`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -73,14 +75,42 @@ const EventPage = () => {
         })
         .then(res => res.json())
         .then(data => {
-            setCatDetail(data);
-            setCatDetailLoading(false);
+            // Handle both old array format and new wrapper format
+            if (data && typeof data === 'object' && data.data !== undefined) {
+                // New wrapper format: {mode, data}
+                setCatDetail(data.data);
+            } else if (Array.isArray(data)) {
+                // Old array format for backward compatibility
+                setCatDetail(data);
+            } else {
+                setCatDetail(null);
+            }
+            if (!silent) {
+                setCatDetailLoading(false);
+            }
         })
         .catch(() => {
-            setCatDetail(null);
-            setCatDetailLoading(false);
+            if (!silent) {
+                setCatDetail(null);
+                setCatDetailLoading(false);
+            }
         });
+    };
+
+    useEffect(() => {
+        fetchCategoryData();
     }, [selectedCat, eventId]);
+
+    // Auto-refresh disabled
+    // useEffect(() => {
+    //     if (!selectedCat || selectedCat.raceMode !== 'LAP') return;
+    //     
+    //     const intervalId = setInterval(() => {
+    //         fetchCategoryData(true); // silent = true
+    //     }, 5000);
+
+    //     return () => clearInterval(intervalId);
+    // }, [selectedCat, eventId]);
 
     useEffect(() => {
         const handleResize = () => setIsMobile(window.innerWidth <= 600);
@@ -235,7 +265,7 @@ const EventPage = () => {
 
     // Column display name mapping
 const columnDisplayNames = {
-    rank1Cat: 'Cat Rank',
+    rank1Cat: 'Rank',
     rank1Tot: 'Overall',
     rank1Mix: 'Gender',
     bib: 'Bib',
@@ -254,69 +284,89 @@ let displayData = [];
 if (viewMode === 'category') {
     displayData = catDetail;
     if (Array.isArray(catDetail) && catDetail.length > 0) {
-        // Always show these columns first
-        columns = [
-            'rank1Cat', 'bib', 'name', 'officialTime', 'netTime', 'timeStart'
-        ];
+        // Check if this is LAP mode
+        const isLapMode = selectedCat && selectedCat.raceMode === 'LAP';
+        
+        if (isLapMode) {
+            // LAP mode: build columns based on checkpointlist
+            // checkpointlist format: "200,400,12,5000" where:
+            // 1st = halflap distance, 2nd = fulllap distance, 3rd = lap count, 4th = total distance
+            columns = [
+                'rank1Cat', 'bib', 'name', 'lap', 'timeStart', 'timeFinish'
+            ];
+            
+            // Parse checkpointlist to determine number of lap times
+            if (selectedCat.checkpointlist) {
+                const parts = selectedCat.checkpointlist.split(',');
+                const lapCount = parseInt(parts[2]) || 0;
+                
+                // Add time columns for each lap
+                for (let i = 1; i <= lapCount; i++) {
+                    const timeKey = `time${i}`;
+                    columns.push(timeKey);
+                    columnDisplayNames[timeKey] = `Lap ${i}`;
+                }
+            }
+            
+            // Process display data to calculate lap numbers dynamically
+            displayData = catDetail
+                .map(row => {
+                    // Calculate lap = highest lap number with data
+                    let maxLap = null;
+                    const lapTimes = row.lapTimes || {};
+                    for (let i = 1; i <= 99; i++) {
+                        if (lapTimes[`time${i}`] !== null && lapTimes[`time${i}`] !== undefined) {
+                            maxLap = i;
+                        }
+                    }
+                    return {
+                        ...row,
+                        lap: maxLap // Override lap with calculated value
+                    };
+                })
+                // Filter out participants without valid rank1Cat (null or 0)
+                .filter(row => row.rank1Cat && row.rank1Cat > 0)
+                // Sort by rank1Cat ascending
+                .sort((a, b) => {
+                    const rankA = a.rank1Cat || Infinity;
+                    const rankB = b.rank1Cat || Infinity;
+                    return rankA - rankB;
+                });
+        } else {
+            // NORMAL mode: build columns from cplist (checkpoint list in response)
+            columns = [
+                'rank1Cat', 'bib', 'name', 'officialTime', 'netTime', 'timeStart'
+            ];
 
-        // Parse cplist for CP columns
-        const cplist = catDetail[0].cplist
-            ? catDetail[0].cplist.split(',').map(cp => cp.trim().replace('Time', 'time')) // Convert "TimeCP1" to "timeCP1"
-            : [];
+            // Parse cplist for CP columns
+            const cplist = catDetail[0].cplist
+                ? catDetail[0].cplist.split(',').map(cp => cp.trim().replace('Time', 'time')) // Convert "TimeCP1" to "timeCP1"
+                : [];
 
-        // Dynamically rename timeCP columns
-        const availableTimeCPs = cplist.filter(cp => /^timeCP\d+$/.test(cp)); // Ensure valid timeCP keys
-        availableTimeCPs.forEach((key, index) => {
-            columnDisplayNames[key] = `Split_${index + 1}`;
-            if (!columns.includes(key)) columns.push(key); // Add to columns if not already present
-        });
+            // Dynamically rename timeCP columns
+            const availableTimeCPs = cplist.filter(cp => /^timeCP\d+$/.test(cp)); // Ensure valid timeCP keys
+            availableTimeCPs.forEach((key, index) => {
+                columnDisplayNames[key] = `Split_${index + 1}`;
+                if (!columns.includes(key)) columns.push(key); // Add to columns if not already present
+            });
 
-        // Always show finish and official/net time
-        if (!columns.includes('timeFinish')) columns.push('timeFinish');
+            // Always show finish and official/net time
+            if (!columns.includes('timeFinish')) columns.push('timeFinish');
+        }
     }
 } else if (viewMode === 'overall') {
     displayData = rankData;
     if (Array.isArray(rankData) && rankData.length > 0) {
         columns = [
-            'rank1Tot', 'rank1Mix', 'rank1Cat', 'bib', 'name', 'cat', 'officialTime', 'netTime', 'timeStart'
+            'rank1Tot', 'rank1Mix', 'rank1Cat', 'bib', 'name', 'cat', 'officialTime', 'netTime'
         ];
-        
-        // Parse cplist for CP columns
-        const cplist = rankData[0].cplist
-            ? rankData[0].cplist.split(',').map(cp => cp.trim().replace('Time', 'time')) // Convert "TimeCP1" to "timeCP1"
-            : [];
-
-        // Dynamically add timeCP columns from cplist
-        const availableTimeCPs = cplist.filter(cp => /^timeCP\d+$/.test(cp));
-        availableTimeCPs.forEach((key, index) => {
-            columnDisplayNames[key] = `Split_${index + 1}`;
-            if (!columns.includes(key)) columns.push(key);
-        });
-
-        // Add timeFinish at the end
-        if (!columns.includes('timeFinish')) columns.push('timeFinish');
     }
 } else if (viewMode === 'gender') {
     displayData = rankData;
     if (Array.isArray(rankData) && rankData.length > 0) {
         columns = [
-            'rank1Mix', 'rank1Cat', 'bib', 'name', 'cat', 'officialTime', 'netTime', 'timeStart'
+            'rank1Mix', 'rank1Cat', 'bib', 'name', 'cat', 'officialTime', 'netTime'
         ];
-        
-        // Parse cplist for CP columns
-        const cplist = rankData[0].cplist
-            ? rankData[0].cplist.split(',').map(cp => cp.trim().replace('Time', 'time')) // Convert "TimeCP1" to "timeCP1"
-            : [];
-
-        // Dynamically add timeCP columns from cplist
-        const availableTimeCPs = cplist.filter(cp => /^timeCP\d+$/.test(cp));
-        availableTimeCPs.forEach((key, index) => {
-            columnDisplayNames[key] = `Split_${index + 1}`;
-            if (!columns.includes(key)) columns.push(key);
-        });
-
-        // Add timeFinish at the end
-        if (!columns.includes('timeFinish')) columns.push('timeFinish');
     }
 }
 
@@ -469,7 +519,13 @@ if (viewMode === 'category') {
                         Statistic
                     </button>
                     <button
-                        onClick={() => window.open(`/public/leaderboard/${eventId}`, '_blank')}
+                        onClick={() => {
+                            const isLapMode = selectedCat && selectedCat.raceMode === 'LAP';
+                            const url = isLapMode 
+                                ? `/public/lap-leaderboard/${eventId}` 
+                                : `/public/leaderboard/${eventId}`;
+                            window.open(url, '_blank');
+                        }}
                         style={{
                             background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
                             color: '#fff',
@@ -815,97 +871,218 @@ if (viewMode === 'category') {
                     <div>Loading details...</div>
                 ) : displayData && columns.length > 0 ? (
                     <div style={{ width: '100%' }}>
-                        <div style={{
-                            width: '100%',
-                            overflowX: 'auto', // enables horizontal scroll on mobile
-                        }}>
-                            <table
-                                style={{
-                                    width: '100%',
-                                    minWidth: 600, // ensures table doesn't shrink too much
-                                    maxWidth: '100%',
-                                    tableLayout: 'auto',
-                                    borderCollapse: 'collapse',
-                                    marginTop: 0,
-                                    fontSize: '1rem'
-                                }}
-                            >
-                                <thead>
-                                    <tr>
-                                        {columns.map(key => {
-                                            let minWidth;
-                                            if (key === 'rank1Cat' || key === 'rank1Tot' || key === 'rank1Mix') minWidth = 70;
-                                            else if (key === 'bib') minWidth = 70;
-                                            else if (key === 'name') minWidth = 200;
-                                            else if (key === 'cat') minWidth = 100;
-                                            else minWidth = 90;
-                                            return (
-                                                <th
-                                                    key={key}
-                                                    style={{
-                                                        textAlign: 'left',
-                                                        padding: '6px 4px',
-                                                        background: '#f0f6ff',
-                                                        whiteSpace: 'normal',
-                                                        fontSize: 13,
-                                                        wordBreak: 'break-word',
-                                                        overflow: 'hidden',
-                                                        textOverflow: 'ellipsis',
-                                                        minWidth,
-                                                    }}
-                                                >
-                                                    {columnDisplayNames[key] || key}
-                                                </th>
-                                            );
-                                        })}
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {displayData.map((row, idx) => (
-                                        <tr
-                                            key={idx}
-                                            style={{
-                                                background: idx % 2 === 0 ? '#fff' : '#f7f7f7'
-                                            }}
-                                        >
-                                            {columns.map((key, i) => {
-                                                let minWidth;
-                                                if (key === 'rank1Cat' || key === 'rank1Tot' || key === 'rank1Mix') minWidth = 70;
-                                                else if (key === 'bib') minWidth = 70;
-                                                else if (key === 'name') minWidth = 200;
-                                                else if (key === 'cat') minWidth = 100;
-                                                else minWidth = 90;
-                                                return (
-                                                    <td
-                                                        key={i}
+                        {selectedCat && selectedCat.raceMode === 'LAP' ? (
+                            // LAP mode: Split table with sticky columns
+                            <div style={{ display: 'flex', width: '100%' }}>
+                                {/* Fixed columns table */}
+                                <div style={{ flexShrink: 0 }}>
+                                    <table style={{
+                                        borderCollapse: 'collapse',
+                                        marginTop: 0,
+                                        fontSize: '1rem'
+                                    }}>
+                                        <thead>
+                                            <tr>
+                                                {['rank1Cat', 'bib', 'name', 'lap', 'timeStart', 'timeFinish'].map(key => (
+                                                    <th
+                                                        key={key}
                                                         style={{
-                                                            padding: '6px 4px',
-                                                            fontSize: 12,
-                                                            wordBreak: 'break-word',
-                                                            overflow: 'hidden',
-                                                            textOverflow: 'ellipsis',
-                                                            minWidth,
+                                                            textAlign: 'left',
+                                                            padding: '8px 12px',
+                                                            background: '#f0f6ff',
+                                                            whiteSpace: 'nowrap',
+                                                            fontSize: 13,
+                                                            fontWeight: 'bold',
+                                                            border: '1px solid #ddd',
                                                         }}
                                                     >
-                                                        {row[key] !== undefined
-                                                            ? (isMobile && (
-                                                                key === 'officialTime' ||
-                                                                key === 'netTime' ||
-                                                                key === 'timeStart' ||
-                                                                key === 'timeFinish' ||
-                                                                /^timeCP\d+$/.test(key)
-                                                            )
-                                                                ? formatTimeNoMs(row[key])
-                                                                : row[key])
-                                                            : ''}
-                                                    </td>
+                                                        {columnDisplayNames[key] || key}
+                                                    </th>
+                                                ))}
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {displayData.map((row, idx) => (
+                                                <tr
+                                                    key={idx}
+                                                    style={{
+                                                        background: idx % 2 === 0 ? '#fff' : '#f7f7f7',
+                                                        height: '40px'
+                                                    }}
+                                                >
+                                                    {['rank1Cat', 'bib', 'name', 'lap', 'timeStart', 'timeFinish'].map((key, i) => (
+                                                        <td
+                                                            key={i}
+                                                            style={{
+                                                                padding: '8px 12px',
+                                                                fontSize: 12,
+                                                                whiteSpace: 'nowrap',
+                                                                border: '1px solid #ddd',
+                                                            }}
+                                                        >
+                                                            {row[key] !== undefined
+                                                                ? (isMobile && (
+                                                                    key === 'timeStart' ||
+                                                                    key === 'timeFinish'
+                                                                )
+                                                                    ? formatTimeNoMs(row[key])
+                                                                    : row[key])
+                                                                : ''}
+                                                        </td>
+                                                    ))}
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
+                                {/* Scrollable lap time columns */}
+                                <div style={{ 
+                                    overflowX: 'auto', 
+                                    flexGrow: 1,
+                                    borderLeft: '2px solid #999' 
+                                }}>
+                                    <table style={{
+                                        borderCollapse: 'collapse',
+                                        marginTop: 0,
+                                        fontSize: '1rem',
+                                        width: '100%'
+                                    }}>
+                                        <thead>
+                                            <tr>
+                                                {columns.filter(key => /^time\d+$/.test(key)).map(key => (
+                                                    <th
+                                                        key={key}
+                                                        style={{
+                                                            textAlign: 'left',
+                                                            padding: '8px 12px',
+                                                            background: '#f0f6ff',
+                                                            whiteSpace: 'nowrap',
+                                                            fontSize: 13,
+                                                            fontWeight: 'bold',
+                                                            border: '1px solid #ddd',
+                                                        }}
+                                                    >
+                                                        {columnDisplayNames[key] || key}
+                                                    </th>
+                                                ))}
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {displayData.map((row, idx) => {
+                                                const lapTimes = row.lapTimes || {};
+                                                return (
+                                                <tr
+                                                    key={idx}
+                                                    style={{
+                                                        background: idx % 2 === 0 ? '#fff' : '#f7f7f7',
+                                                        height: '40px'
+                                                    }}
+                                                >
+                                                    {columns.filter(key => /^time\d+$/.test(key)).map((key, i) => (
+                                                        <td
+                                                            key={i}
+                                                            style={{
+                                                                padding: '8px 12px',
+                                                                fontSize: 12,
+                                                                whiteSpace: 'nowrap',
+                                                                border: '1px solid #ddd',
+                                                            }}
+                                                        >
+                                                            {lapTimes[key] !== undefined && lapTimes[key] !== null
+                                                                ? (isMobile ? formatTimeNoMs(lapTimes[key]) : lapTimes[key])
+                                                                : ''}
+                                                        </td>
+                                                    ))}
+                                                </tr>
+                                                );
+                                            })}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        ) : (
+                            // NORMAL mode: Single scrollable table
+                            <div style={{
+                                width: '100%',
+                                overflowX: 'auto',
+                            }}>
+                                <table
+                                    style={{
+                                        width: '100%',
+                                        minWidth: 'min-content',
+                                        tableLayout: 'auto',
+                                        borderCollapse: 'collapse',
+                                        marginTop: 0,
+                                        fontSize: '1rem'
+                                    }}
+                                >
+                                    <thead>
+                                        <tr>
+                                            {columns.map(key => {
+                                                return (
+                                                    <th
+                                                        key={key}
+                                                        style={{
+                                                            textAlign: 'left',
+                                                            padding: '8px 12px',
+                                                            background: '#f0f6ff',
+                                                            whiteSpace: 'nowrap',
+                                                            fontSize: 13,
+                                                            fontWeight: 'bold',
+                                                            overflow: 'hidden',
+                                                            textOverflow: 'ellipsis',
+                                                            border: '1px solid #ddd',
+                                                            minWidth: 'auto',
+                                                        }}
+                                                    >
+                                                        {columnDisplayNames[key] || key}
+                                                    </th>
                                                 );
                                             })}
                                         </tr>
-                                    ))}
-                                </tbody>
-                            </table>
-                        </div>
+                                    </thead>
+                                    <tbody>
+                                        {displayData.map((row, idx) => (
+                                            <tr
+                                                key={idx}
+                                                style={{
+                                                    background: idx % 2 === 0 ? '#fff' : '#f7f7f7'
+                                                }}
+                                            >
+                                                {columns.map((key, i) => {
+                                                    return (
+                                                        <td
+                                                            key={i}
+                                                            style={{
+                                                                padding: '8px 12px',
+                                                                fontSize: 12,
+                                                                whiteSpace: 'nowrap',
+                                                                overflow: 'hidden',
+                                                                textOverflow: 'ellipsis',
+                                                                border: '1px solid #ddd',
+                                                            }}
+                                                        >
+                                                            {row[key] !== undefined
+                                                                ? (isMobile && (
+                                                                    key === 'officialTime' ||
+                                                                    key === 'netTime' ||
+                                                                    key === 'timeStart' ||
+                                                                    key === 'timeFinish' ||
+                                                                    /^time\d+$/.test(key) ||
+                                                                    /^timeCP\d+$/.test(key)
+                                                                )
+                                                                    ? formatTimeNoMs(row[key])
+                                                                    : row[key])
+                                                                : ''}
+                                                        </td>
+                                                    );
+                                                })}
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        )}
                     </div>
                 ) : (
                     <div style={{ color: '#888', textAlign: 'center' }}>Select a category to view details.</div>

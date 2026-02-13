@@ -22,6 +22,7 @@ import NoStartButFinished from './NoStartButFinished';
 import Disqualified from './Disqualified';
 import ProtectedRoute from './ProtectedRoute';
 import PublicLeaderboard from './PublicLeaderboard';
+import LapLeaderboard from './LapLeaderboard';
 
 const headerStyle = {
     padding: '32px 0 16px 0',
@@ -180,6 +181,7 @@ const App = () => {
                         <Route path="/" element={<Home />} />
                         <Route path="/login" element={<Login />} />
                         <Route path="/public/leaderboard/:eventId" element={<PublicLeaderboard />} />
+                        <Route path="/public/lap-leaderboard/:eventId" element={<LapLeaderboard />} />
                         <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
                         <Route path="/eventlisting" element={<ProtectedRoute><EventListing /></ProtectedRoute>} />
                         <Route path="/eventsetup" element={<ProtectedRoute><EventSetup /></ProtectedRoute>} />

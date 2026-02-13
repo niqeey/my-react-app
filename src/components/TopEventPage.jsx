@@ -60,10 +60,12 @@ const TopEventPage = () => {
     }, [eventId]);
 
     // Fetch report on tab click
-    useEffect(() => {
+    const fetchCategoryData = (silent = false) => {
         if (!selectedCat) return;
-        setCatDetailLoading(true);
-        setCatDetail(null);
+        if (!silent) {
+            setCatDetailLoading(true);
+            setCatDetail(null);
+        }
         authFetch(`${apiBase}/report/event/category/top`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -74,14 +76,42 @@ const TopEventPage = () => {
         })
         .then(res => res.json())
         .then(data => {
-            setCatDetail(data);
-            setCatDetailLoading(false);
+            // Handle both old array format and new wrapper format
+            if (data && typeof data === 'object' && data.data !== undefined) {
+                // New wrapper format: {mode, data}
+                setCatDetail(data.data);
+            } else if (Array.isArray(data)) {
+                // Old array format for backward compatibility
+                setCatDetail(data);
+            } else {
+                setCatDetail(null);
+            }
+            if (!silent) {
+                setCatDetailLoading(false);
+            }
         })
         .catch(() => {
-            setCatDetail(null);
-            setCatDetailLoading(false);
+            if (!silent) {
+                setCatDetail(null);
+                setCatDetailLoading(false);
+            }
         });
+    };
+
+    useEffect(() => {
+        fetchCategoryData();
     }, [selectedCat, eventId]);
+
+    // Auto-refresh disabled
+    // useEffect(() => {
+    //     if (!selectedCat || selectedCat.raceMode !== 'LAP') return;
+    //     
+    //     const intervalId = setInterval(() => {
+    //         fetchCategoryData(true); // silent = true
+    //     }, 5000);
+
+    //     return () => clearInterval(intervalId);
+    // }, [selectedCat, eventId]);
 
     if (loading) return <div>Loading categories...</div>;
     if (error) return <div>{error}</div>;
@@ -97,28 +127,68 @@ const TopEventPage = () => {
         netTime: 'NetTime',
     };
 
-    // Get dynamic columns based on cplist
+    // Get dynamic columns based on cplist or raceMode
     let columns = [];
     if (Array.isArray(catDetail) && catDetail.length > 0) {
-        // Always show these columns first
-        columns = [
-            'rank1Cat', 'bib', 'name', 'officialTime', 'netTime', 'timeStart'
-        ];
+        // Check if this is LAP mode
+        const isLapMode = selectedCat && selectedCat.raceMode === 'LAP';
+        
+        if (isLapMode) {
+            // LAP mode: build columns based on checkpointlist
+            // checkpointlist format: "200,400,12,5000" where:
+            // 1st = halflap distance, 2nd = fulllap distance, 3rd = lap count, 4th = total distance
+            columns = [
+                'bib', 'name', 'lap', 'timeStart', 'timeFinish'
+            ];
+            
+            // Parse checkpointlist to determine number of lap times
+            if (selectedCat.checkpointlist) {
+                const parts = selectedCat.checkpointlist.split(',');
+                const lapCount = parseInt(parts[2]) || 0;
+                
+                // Add time columns for each lap
+                for (let i = 1; i <= lapCount; i++) {
+                    const timeKey = `time${i}`;
+                    columns.push(timeKey);
+                    columnDisplayNames[timeKey] = `Lap ${i}`;
+                }
+            }
+            
+            // Process display data to calculate lap numbers dynamically
+            catDetail = catDetail.map(row => {
+                // Calculate lap = highest lap number with data
+                let maxLap = null;
+                for (let i = 1; i <= 99; i++) {
+                    if (row[`time${i}`] !== null && row[`time${i}`] !== undefined) {
+                        maxLap = i;
+                    }
+                }
+                return {
+                    ...row,
+                    lap: maxLap // Override lap with calculated value
+                };
+            });
+        } else {
+            // NORMAL mode: build columns from cplist (checkpoint list in response)
+            columns = [
+                'rank1Cat', 'bib', 'name', 'officialTime', 'netTime', 'timeStart'
+            ];
 
-        // Parse cplist for CP columns
-        const cplist = catDetail[0].cplist
-            ? catDetail[0].cplist.split(',').map(cp => cp.trim().replace('Time', 'time')) // Convert "TimeCP1" to "timeCP1"
-            : [];
+            // Parse cplist for CP columns
+            const cplist = catDetail[0].cplist
+                ? catDetail[0].cplist.split(',').map(cp => cp.trim().replace('Time', 'time')) // Convert "TimeCP1" to "timeCP1"
+                : [];
 
-        // Dynamically rename timeCP columns
-        const availableTimeCPs = cplist.filter(cp => /^timeCP\d+$/.test(cp)); // Ensure valid timeCP keys
-        availableTimeCPs.forEach((key, index) => {
-            columnDisplayNames[key] = `Split_${index + 1}`;
-            if (!columns.includes(key)) columns.push(key); // Add to columns if not already present
-        });
+            // Dynamically rename timeCP columns
+            const availableTimeCPs = cplist.filter(cp => /^timeCP\d+$/.test(cp)); // Ensure valid timeCP keys
+            availableTimeCPs.forEach((key, index) => {
+                columnDisplayNames[key] = `Split_${index + 1}`;
+                if (!columns.includes(key)) columns.push(key); // Add to columns if not already present
+            });
 
-        // Always show finish and official/net time
-        if (!columns.includes('timeFinish')) columns.push('timeFinish');
+            // Always show finish and official/net time
+            if (!columns.includes('timeFinish')) columns.push('timeFinish');
+        }
     }
 
     return (
@@ -276,14 +346,13 @@ const TopEventPage = () => {
                     <div style={{ width: '100%' }}>
                         <div style={{
                             width: '100%',
-                            overflowX: 'auto', // enables horizontal scroll on mobile
+                            overflowX: 'auto', // enables horizontal scroll
                         }}>
                             <table
                                 style={{
                                     width: '100%',
-                                    minWidth: 600, // Ensures table doesn't shrink too much
-                                    maxWidth: '100%',
-                                    tableLayout: 'fixed',
+                                    minWidth: 'min-content', // allows table to expand beyond container
+                                    tableLayout: 'auto', // let browser size columns naturally
                                     borderCollapse: 'collapse',
                                     marginTop: 0,
                                     fontSize: '1rem'
@@ -291,28 +360,20 @@ const TopEventPage = () => {
                             >
                                 <thead>
                                     <tr>
-                                        {columns.map((key, index) => {
-                                            let width;
-                                            if (key === 'rank1Cat') width = '8%'; // First column
-                                            else if (key === 'bib') width = '8%'; // Second column
-                                            else if (key === 'name') width = '20%'; // Third column
-                                            else width = `${(100 - 8 - 8 - 20) / (columns.length - 3)}%`; // Remaining columns
-
+                                        {columns.map((key) => {
                                             return (
                                                 <th
                                                     key={key}
                                                     style={{
                                                         textAlign: 'left',
-                                                        padding: '6px 4px',
+                                                        padding: '8px 12px',
                                                         background: '#f0f6ff',
                                                         fontSize: 13,
-                                                        wordBreak: 'break-word',
+                                                        fontWeight: 'bold',
+                                                        whiteSpace: 'nowrap', // prevent column wrapping
                                                         overflow: 'hidden',
                                                         textOverflow: 'ellipsis',
-                                                        whiteSpace: key === 'name' ? 'normal' : 'nowrap', // Allow wrapping only for the third column
-                                                        width,
-                                                        minWidth: width,
-                                                        maxWidth: width,
+                                                        border: '1px solid #ddd',
                                                     }}
                                                 >
                                                     {columnDisplayNames[key] || key}
@@ -330,25 +391,16 @@ const TopEventPage = () => {
                                             }}
                                         >
                                             {columns.map((key, i) => {
-                                                let width;
-                                                if (key === 'rank1Cat') width = '8%'; // First column
-                                                else if (key === 'bib') width = '8%'; // Second column
-                                                else if (key === 'name') width = '20%'; // Third column
-                                                else width = `${(100 - 8 - 8 - 20) / (columns.length - 3)}%`; // Remaining columns
-
                                                 return (
                                                     <td
                                                         key={i}
                                                         style={{
-                                                            padding: '6px 4px',
+                                                            padding: '8px 12px',
                                                             fontSize: 12,
-                                                            wordBreak: 'break-word',
+                                                            whiteSpace: 'nowrap', // prevent cell wrapping
                                                             overflow: 'hidden',
                                                             textOverflow: 'ellipsis',
-                                                            whiteSpace: key === 'name' ? 'normal' : 'nowrap', // Allow wrapping only for the third column
-                                                            width,
-                                                            minWidth: width,
-                                                            maxWidth: width,
+                                                            border: '1px solid #ddd',
                                                         }}
                                                     >
                                                         {row[key] !== undefined
@@ -357,6 +409,7 @@ const TopEventPage = () => {
                                                                 key === 'netTime' ||
                                                                 key === 'timeStart' ||
                                                                 key === 'timeFinish' ||
+                                                                /^time\d+$/.test(key) ||
                                                                 /^timeCP\d+$/.test(key)
                                                             )
                                                                 ? formatTimeNoMs(row[key]) // Format time for mobile view

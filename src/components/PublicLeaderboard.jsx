@@ -77,10 +77,10 @@ const PublicLeaderboard = () => {
         // Initial fetch
         fetchAllCategories();
 
-        // Set up auto-refresh every 2 seconds (silent updates)
-        const interval = setInterval(fetchAllCategories, 2000);
+        // Auto-refresh disabled
+        // const interval = setInterval(fetchAllCategories, 2000);
 
-        return () => clearInterval(interval);
+        // return () => clearInterval(interval);
     }, [categories, eventId]);
 
     useEffect(() => {
