@@ -1,15 +1,11 @@
 import React from 'react';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
-import { BrowserRouter } from 'react-router-dom';
-import Login from '../Login';
-import { OrgProvider } from '../OrgContext';
+import { BrowserRouter, __setNavigate } from 'react-router-dom';
+import Login from './Login';
+import { OrgProvider } from './OrgContext';
 
 // Mock useNavigate
 const mockNavigate = jest.fn();
-jest.mock('react-router-dom', () => ({
-    ...jest.requireActual('react-router-dom'),
-    useNavigate: () => mockNavigate
-}));
 
 // Mock fetch
 global.fetch = jest.fn();
@@ -17,6 +13,7 @@ global.fetch = jest.fn();
 describe('Login Component', () => {
     beforeEach(() => {
         jest.clearAllMocks();
+        __setNavigate(mockNavigate);
         
         // Mock sessionStorage
         Storage.prototype.setItem = jest.fn();

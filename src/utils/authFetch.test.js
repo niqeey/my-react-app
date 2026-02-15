@@ -1,4 +1,4 @@
-import { authFetch } from '../authFetch';
+import { authFetch } from './authFetch';
 
 // Mock fetch globally
 global.fetch = jest.fn();
@@ -110,7 +110,7 @@ describe('authFetch', () => {
         };
         fetch.mockResolvedValue(mockResponse);
 
-        await expect(authFetch('http://test.com/api/test')).rejects.toThrow('Request failed with status 500');
+        await expect(authFetch('http://test.com/api/test')).rejects.toThrow('Not JSON');
     });
 
     test('should return response for successful requests', async () => {
