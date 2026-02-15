@@ -153,13 +153,16 @@ const LapLeaderboard = () => {
         return max;
     };
 
-    // Helper function to convert time string HH:MM:SS to seconds for comparison
+    // Helper function to convert time string HH:MM:SS.mmm to seconds (with millisecond precision)
     const timeToSeconds = (timeStr) => {
         if (!timeStr || timeStr === '-' || timeStr === '0') return Infinity;
         const parts = timeStr.split(':');
-        if (parts.length !== 3) return Infinity;
+        if (parts.length < 3) return Infinity;
         try {
-            return parseInt(parts[0]) * 3600 + parseInt(parts[1]) * 60 + parseInt(parts[2]);
+            const hours = parseInt(parts[0]);
+            const minutes = parseInt(parts[1]);
+            const secondsWithMs = parseFloat(parts[2]); // Include milliseconds
+            return hours * 3600 + minutes * 60 + secondsWithMs;
         } catch (e) {
             return Infinity;
         }
@@ -245,12 +248,15 @@ const LapLeaderboard = () => {
         const diffSeconds = maxLapSeconds - startSeconds;
         if (diffSeconds <= 0) return maxLapTime;
         
-        // Convert back to HH:MM:SS format
+        // Convert back to HH:MM:SS.mmm format (with milliseconds for precise ranking)
         const hours = Math.floor(diffSeconds / 3600);
         const minutes = Math.floor((diffSeconds % 3600) / 60);
-        const seconds = Math.floor(diffSeconds % 60);
+        const secondsWithMs = diffSeconds % 60;
         
-        return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+        // Format with milliseconds (3 decimal places)
+        const secondsFormatted = secondsWithMs.toFixed(3);
+        
+        return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(secondsFormatted).padStart(6, '0')}`;
     };
 
     return (

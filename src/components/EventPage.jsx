@@ -29,6 +29,7 @@ const EventPage = () => {
     const [selectedGender, setSelectedGender] = useState('M');
     const [rankData, setRankData] = useState([]);
     const [rankDataLoading, setRankDataLoading] = useState(false);
+    const [rankMode, setRankMode] = useState('TIME'); // Track mode for overall/gender views
     
     // Load categories
     useEffect(() => {
@@ -138,7 +139,18 @@ const EventPage = () => {
             })
             .then(res => res.json())
             .then(data => {
-                setRankData(data);
+                // Handle wrapper format: {mode, data}
+                if (data && typeof data === 'object' && data.data !== undefined) {
+                    setRankMode(data.mode || 'TIME');
+                    setRankData(data.data);
+                } else if (Array.isArray(data)) {
+                    // Old format for backward compatibility
+                    setRankMode('TIME');
+                    setRankData(data);
+                } else {
+                    setRankMode('TIME');
+                    setRankData([]);
+                }
                 setRankDataLoading(false);
             })
             .catch(() => {
@@ -157,7 +169,18 @@ const EventPage = () => {
             })
             .then(res => res.json())
             .then(data => {
-                setRankData(data);
+                // Handle wrapper format: {mode, data}
+                if (data && typeof data === 'object' && data.data !== undefined) {
+                    setRankMode(data.mode || 'TIME');
+                    setRankData(data.data);
+                } else if (Array.isArray(data)) {
+                    // Old format for backward compatibility
+                    setRankMode('TIME');
+                    setRankData(data);
+                } else {
+                    setRankMode('TIME');
+                    setRankData([]);
+                }
                 setRankDataLoading(false);
             })
             .catch(() => {
@@ -186,7 +209,7 @@ const EventPage = () => {
             const result = await response.json();
 
             // Extract and log the cplist
-            const cplist = result.cplist ? result.cplist.split(',') : [];
+            // const cplist = result.cplist ? result.cplist.split(',') : [];
             // console.log('CP List:', cplist);
 
             setParticipantDetails(result);
@@ -371,16 +394,157 @@ if (viewMode === 'category') {
 } else if (viewMode === 'overall') {
     displayData = rankData;
     if (Array.isArray(rankData) && rankData.length > 0) {
-        columns = [
-            'rank1Tot', 'rank1Mix', 'rank1Cat', 'bib', 'name', 'cat', 'officialTime', 'netTime'
-        ];
+        // Check if this is LAP mode
+        if (rankMode === 'LAP') {
+            // LAP mode: build columns based on lap data
+            columns = [
+                'rank1Tot', 'rank1Mix', 'rank1Cat', 'lap', 'bib', 'name', 'cat', 'timeStart', 'officialTime', 'netTime'
+            ];
+            
+            // Get max laps dynamically
+            const maxLaps = Math.max(...rankData.map(row => row.lap || 0));
+            
+            // Check if halflap exists (time0)
+            const hasHalfLap = rankData.some(row => row.lapTimes && row.lapTimes.time0);
+            
+            // Add "1/2 Lap" column if halflap exists
+            if (hasHalfLap) {
+                columns.push('time0');
+                columnDisplayNames['time0'] = '1/2 Lap';
+            }
+            
+            // Add time columns for each lap based on max displayed laps (maxLaps - 1)
+            for (let i = 1; i < maxLaps; i++) {
+                const timeKey = `time${i}`;
+                columns.push(timeKey);
+                columnDisplayNames[timeKey] = `Lap ${i}`;
+            }
+            
+            // Always add timeFinish
+            columns.push('timeFinish');
+            
+            // Process display data to flatten lap times
+            displayData = rankData
+                .map(row => {
+                    const lapTimes = row.lapTimes || {};
+
+                    // Find last lap time
+                    let lastLapTime = null;
+                    for (let i = 1; i <= 99; i++) {
+                        if (lapTimes[`time${i}`]) {
+                            lastLapTime = lapTimes[`time${i}`];
+                        }
+                    }
+                    return {
+                        ...row,
+                        ...lapTimes, // Flatten lapTimes to row level
+                        timeFinish: lastLapTime || row.timeFinish
+                    };
+                })
+                // Filter out participants without valid rank
+                .filter(row => row.rank1Cat && row.rank1Cat > 0)
+                // Sort by rank ascending
+                .sort((a, b) => {
+                    const rankA = a.rank1Cat || Infinity;
+                    const rankB = b.rank1Cat || Infinity;
+                    return rankA - rankB;
+                });
+        } else {
+            // TIME mode: parse cplist for checkpoint columns
+            columns = [
+                'rank1Tot', 'rank1Mix', 'rank1Cat', 'bib', 'name', 'cat', 'officialTime', 'netTime', 'timeStart'
+            ];
+            
+            // Parse cplist for CP columns
+            if (rankData[0] && rankData[0].cplist) {
+                const cplist = rankData[0].cplist.split(',').map(cp => cp.trim().replace('Time', 'time'));
+                const availableTimeCPs = cplist.filter(cp => /^timeCP\d+$/.test(cp));
+                availableTimeCPs.forEach((key, index) => {
+                    columnDisplayNames[key] = `Split_${index + 1}`;
+                    if (!columns.includes(key)) columns.push(key);
+                });
+            }
+            
+            // Always show finish time
+            if (!columns.includes('timeFinish')) columns.push('timeFinish');
+        }
     }
 } else if (viewMode === 'gender') {
     displayData = rankData;
     if (Array.isArray(rankData) && rankData.length > 0) {
-        columns = [
-            'rank1Mix', 'rank1Cat', 'bib', 'name', 'cat', 'officialTime', 'netTime'
-        ];
+        // Check if this is LAP mode
+        if (rankMode === 'LAP') {
+            // LAP mode: build columns based on lap data
+            columns = [
+                'rank1Mix', 'rank1Cat', 'lap', 'bib', 'name', 'cat', 'timeStart', 'officialTime', 'netTime'
+            ];
+            
+            // Get max laps dynamically
+            const maxLaps = Math.max(...rankData.map(row => row.lap || 0));
+            
+            // Check if halflap exists (time0)
+            const hasHalfLap = rankData.some(row => row.lapTimes && row.lapTimes.time0);
+            
+            // Add "1/2 Lap" column if halflap exists
+            if (hasHalfLap) {
+                columns.push('time0');
+                columnDisplayNames['time0'] = '1/2 Lap';
+            }
+            
+            // Add time columns for each lap based on max displayed laps (maxLaps - 1)
+            for (let i = 1; i < maxLaps; i++) {
+                const timeKey = `time${i}`;
+                columns.push(timeKey);
+                columnDisplayNames[timeKey] = `Lap ${i}`;
+            }
+            
+            // Always add timeFinish
+            columns.push('timeFinish');
+            
+            // Process display data to flatten lap times
+            displayData = rankData
+                .map(row => {
+                    const lapTimes = row.lapTimes || {};
+                    // Find last lap time
+                    let lastLapTime = null;
+                    for (let i = 1; i <= 99; i++) {
+                        if (lapTimes[`time${i}`]) {
+                            lastLapTime = lapTimes[`time${i}`];
+                        }
+                    }
+                    return {
+                        ...row,
+                        ...lapTimes, // Flatten lapTimes to row level
+                        timeFinish: lastLapTime || row.timeFinish
+                    };
+                })
+                // Filter out participants without valid rank
+                .filter(row => row.rank1Cat && row.rank1Cat > 0)
+                // Sort by rank ascending
+                .sort((a, b) => {
+                    const rankA = a.rank1Cat || Infinity;
+                    const rankB = b.rank1Cat || Infinity;
+                    return rankA - rankB;
+                });
+        } else {
+            // TIME mode: parse cplist for checkpoint columns
+            columns = [
+                'rank1Mix', 'rank1Cat', 'bib', 'name', 'cat', 'officialTime', 'netTime', 'timeStart'
+            ];
+            
+            // Parse cplist for CP columns
+            if (rankData[0] && rankData[0].cplist) {
+                const cplist = rankData[0].cplist.split(',').map(cp => cp.trim().replace('Time', 'time'));
+                const availableTimeCPs = cplist.filter(cp => /^timeCP\d+$/.test(cp));
+                availableTimeCPs.forEach((key, index) => {
+                    columnDisplayNames[key] = `Split_${index + 1}`;
+                    if (!columns.includes(key)) columns.push(key);
+                });
+            }
+            
+            // Always show finish time
+            if (!columns.includes('timeFinish')) columns.push('timeFinish');
+        }
     }
 }
 
