@@ -31,6 +31,28 @@ const TopEventPage = () => {
         return val.replace(/\.\d{1,3}$/, '');
     }
 
+    function timeToSeconds(timeStr) {
+        if (!timeStr || timeStr === '-' || timeStr === '0') return Infinity;
+        const parts = timeStr.split(':');
+        if (parts.length < 3) return Infinity;
+        const hours = parseInt(parts[0], 10);
+        const minutes = parseInt(parts[1], 10);
+        const secondsWithMs = parseFloat(parts[2]);
+        if (Number.isNaN(hours) || Number.isNaN(minutes) || Number.isNaN(secondsWithMs)) {
+            return Infinity;
+        }
+        return (hours * 3600) + (minutes * 60) + secondsWithMs;
+    }
+
+    function formatSeconds(totalSeconds) {
+        if (!Number.isFinite(totalSeconds) || totalSeconds <= 0) return '';
+        const hours = Math.floor(totalSeconds / 3600);
+        const minutes = Math.floor((totalSeconds % 3600) / 60);
+        const secondsWithMs = totalSeconds % 60;
+        const secondsFormatted = secondsWithMs.toFixed(3);
+        return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(secondsFormatted).padStart(6, '0')}`;
+    }
+
     // Load categories
     useEffect(() => {
         authFetch(`${apiBase}/race/categories`, {
@@ -158,14 +180,28 @@ const TopEventPage = () => {
             catDetail = catDetail.map(row => {
                 // Calculate lap = highest lap number with data
                 let maxLap = null;
+                let lastLapTime = null;
                 for (let i = 1; i <= 99; i++) {
                     if (row[`time${i}`] !== null && row[`time${i}`] !== undefined) {
                         maxLap = i;
+                        lastLapTime = row[`time${i}`];
                     }
                 }
+                const finishSeconds = timeToSeconds(lastLapTime);
+                const startSeconds = timeToSeconds(row.timeStart);
+                const gunSeconds = timeToSeconds(row.timeGun);
+                const officialTime = (finishSeconds !== Infinity && startSeconds !== Infinity)
+                    ? formatSeconds(finishSeconds - startSeconds)
+                    : row.officialTime;
+                const netTime = (finishSeconds !== Infinity && gunSeconds !== Infinity)
+                    ? formatSeconds(finishSeconds - gunSeconds)
+                    : row.netTime;
                 return {
                     ...row,
-                    lap: maxLap // Override lap with calculated value
+                    lap: maxLap, // Override lap with calculated value
+                    timeFinish: lastLapTime || row.timeFinish,
+                    officialTime,
+                    netTime
                 };
             });
         } else {

@@ -354,11 +354,22 @@ if (viewMode === 'category') {
                             lastLapTime = lapTimes[`time${i}`];
                         }
                     }
+                    const finishSeconds = timeToSeconds(lastLapTime);
+                    const startSeconds = timeToSeconds(row.timeStart);
+                    const gunSeconds = timeToSeconds(row.timeGun);
+                    const officialTime = (finishSeconds !== Infinity && startSeconds !== Infinity)
+                        ? formatSeconds(finishSeconds - startSeconds)
+                        : row.officialTime;
+                    const netTime = (finishSeconds !== Infinity && gunSeconds !== Infinity)
+                        ? formatSeconds(finishSeconds - gunSeconds)
+                        : row.netTime;
                     return {
                         ...row,
                         ...lapTimes, // Flatten lapTimes to row level (time0, time1, time2, etc.)
                         lap: maxLap, // lap count = highest timeN index (time1=Lap 1, time2=Lap 2, etc.)
-                        timeFinish: lastLapTime || row.timeFinish // Map timeFinish to last lap time
+                        timeFinish: lastLapTime || row.timeFinish, // Map timeFinish to last lap time
+                        officialTime,
+                        netTime
                     };
                 })
                 // Filter out participants without valid rank1Cat (null or 0)
@@ -435,10 +446,21 @@ if (viewMode === 'category') {
                             lastLapTime = lapTimes[`time${i}`];
                         }
                     }
+                    const finishSeconds = timeToSeconds(lastLapTime);
+                    const startSeconds = timeToSeconds(row.timeStart);
+                    const gunSeconds = timeToSeconds(row.timeGun);
+                    const officialTime = (finishSeconds !== Infinity && startSeconds !== Infinity)
+                        ? formatSeconds(finishSeconds - startSeconds)
+                        : row.officialTime;
+                    const netTime = (finishSeconds !== Infinity && gunSeconds !== Infinity)
+                        ? formatSeconds(finishSeconds - gunSeconds)
+                        : row.netTime;
                     return {
                         ...row,
                         ...lapTimes, // Flatten lapTimes to row level
-                        timeFinish: lastLapTime || row.timeFinish
+                        timeFinish: lastLapTime || row.timeFinish,
+                        officialTime,
+                        netTime
                     };
                 })
                 // Filter out participants without valid rank
@@ -512,10 +534,21 @@ if (viewMode === 'category') {
                             lastLapTime = lapTimes[`time${i}`];
                         }
                     }
+                    const finishSeconds = timeToSeconds(lastLapTime);
+                    const startSeconds = timeToSeconds(row.timeStart);
+                    const gunSeconds = timeToSeconds(row.timeGun);
+                    const officialTime = (finishSeconds !== Infinity && startSeconds !== Infinity)
+                        ? formatSeconds(finishSeconds - startSeconds)
+                        : row.officialTime;
+                    const netTime = (finishSeconds !== Infinity && gunSeconds !== Infinity)
+                        ? formatSeconds(finishSeconds - gunSeconds)
+                        : row.netTime;
                     return {
                         ...row,
                         ...lapTimes, // Flatten lapTimes to row level
-                        timeFinish: lastLapTime || row.timeFinish
+                        timeFinish: lastLapTime || row.timeFinish,
+                        officialTime,
+                        netTime
                     };
                 })
                 // Filter out participants without valid rank
@@ -585,6 +618,28 @@ if (viewMode === 'category') {
         if (typeof val !== 'string') return val;
         // Remove .xxx if present (milliseconds)
         return val.replace(/\.\d{1,3}$/, '');
+    }
+
+    function timeToSeconds(timeStr) {
+        if (!timeStr || timeStr === '-' || timeStr === '0') return Infinity;
+        const parts = timeStr.split(':');
+        if (parts.length < 3) return Infinity;
+        const hours = parseInt(parts[0], 10);
+        const minutes = parseInt(parts[1], 10);
+        const secondsWithMs = parseFloat(parts[2]);
+        if (Number.isNaN(hours) || Number.isNaN(minutes) || Number.isNaN(secondsWithMs)) {
+            return Infinity;
+        }
+        return (hours * 3600) + (minutes * 60) + secondsWithMs;
+    }
+
+    function formatSeconds(totalSeconds) {
+        if (!Number.isFinite(totalSeconds) || totalSeconds <= 0) return '';
+        const hours = Math.floor(totalSeconds / 3600);
+        const minutes = Math.floor((totalSeconds % 3600) / 60);
+        const secondsWithMs = totalSeconds % 60;
+        const secondsFormatted = secondsWithMs.toFixed(3);
+        return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(secondsFormatted).padStart(6, '0')}`;
     }
 
     return (

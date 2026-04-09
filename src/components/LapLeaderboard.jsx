@@ -138,7 +138,7 @@ const LapLeaderboard = () => {
 
     // Helper function to get maximum lap count from lap times
     // Only consider time1 onwards (time0 is half lap or ignored)
-    const getMaxLaps = (participants) => {
+    const getMaxLaps = (participants, maxLapLimit = 0) => {
         let max = 0;
         participants.forEach(p => {
             if (p.lapTimes) {
@@ -150,6 +150,9 @@ const LapLeaderboard = () => {
                 }
             }
         });
+        if (maxLapLimit && maxLapLimit > 0) {
+            return Math.min(max, maxLapLimit);
+        }
         return max;
     };
 
@@ -169,8 +172,8 @@ const LapLeaderboard = () => {
     };
 
     // Helper function to sort participants by max lap time (shortest first)
-    const getSortedParticipants = (participants) => {
-        const maxLaps = getMaxLaps(participants);
+    const getSortedParticipants = (participants, maxLapLimit = 0) => {
+        const maxLaps = getMaxLaps(participants, maxLapLimit);
         
         // Create array with time on max lap for sorting
         const withMaxLapTime = participants.map(p => {
@@ -200,12 +203,16 @@ const LapLeaderboard = () => {
 
     // Helper function to calculate lap count (count non-null lap times)
     // Only count time1 onwards (time0 is either half lap or ignored)
-    const calculateLapCount = (participant) => {
+    const calculateLapCount = (participant, maxLapLimit = 0) => {
         if (!participant.lapTimes) return 0;
         const lapNumbers = Object.keys(participant.lapTimes)
             .map(key => parseInt(key.replace('time', '')))
             .filter(num => !isNaN(num) && num > 0 && participant.lapTimes[`time${num}`]);
-        return lapNumbers.length;
+        const count = lapNumbers.length;
+        if (maxLapLimit && maxLapLimit > 0) {
+            return Math.min(count, maxLapLimit);
+        }
+        return count;
     };
 
     // Extract lap count from 3rd parameter of checkpointlist
@@ -223,40 +230,48 @@ const LapLeaderboard = () => {
         return 0;
     };
 
-    // Helper function to calculate total time (time[maxLap] - timeStart)
-    const calculateTotalTime = (participant) => {
+    // Helper function to calculate total time
+    // Prefer timeFinish - timeStart when available, otherwise sum lap intervals
+    const calculateTotalTime = (participant, maxLapLimit = 0, includeHalfLap = false) => {
+        const formatSeconds = (totalSeconds) => {
+            if (!isFinite(totalSeconds) || totalSeconds <= 0) return '-';
+            const hours = Math.floor(totalSeconds / 3600);
+            const minutes = Math.floor((totalSeconds % 3600) / 60);
+            const secondsWithMs = totalSeconds % 60;
+            const secondsFormatted = secondsWithMs.toFixed(3);
+            return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(secondsFormatted).padStart(6, '0')}`;
+        };
         if (!participant.lapTimes) return '-';
-        
-        // Find the highest lap number with a time
+
         const lapNumbers = Object.keys(participant.lapTimes)
             .map(key => parseInt(key.replace('time', '')))
-            .filter(num => !isNaN(num) && participant.lapTimes[`time${num}`]);
-        
-        if (lapNumbers.length === 0) return '-';
-        
-        const maxLapNum = Math.max(...lapNumbers);
-        const maxLapTime = participant.lapTimes[`time${maxLapNum}`];
-        
-        if (!maxLapTime || !participant.timeStart) return '-';
-        
-        // Try to calculate the difference
-        const maxLapSeconds = timeToSeconds(maxLapTime);
-        const startSeconds = timeToSeconds(participant.timeStart);
-        
-        if (maxLapSeconds === Infinity || startSeconds === Infinity) return maxLapTime;
-        
-        const diffSeconds = maxLapSeconds - startSeconds;
-        if (diffSeconds <= 0) return maxLapTime;
-        
-        // Convert back to HH:MM:SS.mmm format (with milliseconds for precise ranking)
-        const hours = Math.floor(diffSeconds / 3600);
-        const minutes = Math.floor((diffSeconds % 3600) / 60);
-        const secondsWithMs = diffSeconds % 60;
-        
-        // Format with milliseconds (3 decimal places)
-        const secondsFormatted = secondsWithMs.toFixed(3);
-        
-        return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(secondsFormatted).padStart(6, '0')}`;
+            .filter(num => !isNaN(num) && num > 0 && participant.lapTimes[`time${num}`])
+            .sort((a, b) => a - b);
+
+        const cappedLapNumbers = (maxLapLimit && maxLapLimit > 0)
+            ? lapNumbers.filter(num => num <= maxLapLimit)
+            : lapNumbers;
+
+        if (cappedLapNumbers.length === 0 && !includeHalfLap) return '-';
+
+        let totalSeconds = 0;
+
+        if (includeHalfLap && participant.lapTimes.time0) {
+            const halfSeconds = timeToSeconds(participant.lapTimes.time0);
+            if (halfSeconds !== Infinity) {
+                totalSeconds += halfSeconds;
+            }
+        }
+
+        cappedLapNumbers.forEach(num => {
+            const value = participant.lapTimes[`time${num}`];
+            const seconds = timeToSeconds(value);
+            if (seconds !== Infinity) {
+                totalSeconds += seconds;
+            }
+        });
+
+        return formatSeconds(totalSeconds);
     };
 
     return (
@@ -357,8 +372,8 @@ const LapLeaderboard = () => {
                     if (!selectedCat) return null;
                     
                     const participants = catDetails[selectedCat.catId] || [];
-                    const sortedParticipants = getSortedParticipants(participants);
                     const checkpointCount = getCheckpointCount(selectedCat.checkpointlist);
+                    const sortedParticipants = getSortedParticipants(participants, checkpointCount);
                     
                     // Parse cplist to determine if we should show half-lap column
                     // cplist format: "halflap,fulllap,numberOfLaps,totalDistance"
@@ -430,7 +445,7 @@ const LapLeaderboard = () => {
                                             </thead>
                                             <tbody>
                                                 {sortedParticipants.map((p, pIdx) => {
-                                                    const lapCount = calculateLapCount(p);
+                                                    const lapCount = calculateLapCount(p, checkpointCount);
                                                     const isFinalLap = checkpointCount > 0 && lapCount >= checkpointCount;
                                                     const isAlmostFinal = checkpointCount > 0 && lapCount >= (checkpointCount - 1);
                                                     
@@ -448,8 +463,8 @@ const LapLeaderboard = () => {
                                                         <td style={tdStyle}>{p.bib || '-'}</td>
                                                         <td style={{...tdStyle, fontWeight: 500}}>{p.name || '-'}</td>
                                                         <td style={tdStyle}>{p.timeStart || '-'}</td>
-                                                        <td style={tdStyle}>{calculateLapCount(p)}</td>
-                                                        <td style={{...tdStyle, fontWeight: 600, color: '#667eea'}}>{calculateTotalTime(p)}</td>
+                                                        <td style={tdStyle}>{calculateLapCount(p, checkpointCount)}</td>
+                                                        <td style={{...tdStyle, fontWeight: 600, color: '#667eea'}}>{calculateTotalTime(p, checkpointCount, showHalfLap)}</td>
                                                     </tr>
                                                     );
                                                 })}
